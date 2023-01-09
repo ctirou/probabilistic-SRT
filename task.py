@@ -278,7 +278,7 @@ class ExperimentSettings:
         settings_dialog.addField('Monitor Width (cm)', 34.2)
         settings_dialog.addField('Computer name', 'local_cermep')
         settings_dialog.addField('RSI (ms)', 250)
-        settings_dialog.addField('Resting time (s)', 10)
+        settings_dialog.addField('Resting time (s)', 5)
 
         returned_data = settings_dialog.show()
         
@@ -1229,37 +1229,51 @@ class Experiment: # class for running ASRT experiment
                     break
             
             # resting periods
-            # if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
-            if N in self.settings.get_block_starts():
+            if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
+
+                with self.shared_data_lock:
+                    self.last_N = N - 1
+                    self.trial_phase = "before stimulus"
+                    self.last_RSI = - 1
+                                
+                self.resting_period(fixation_cross, self.settings)
+                
+                patternERR = 0
+                responses_in_block = 0
+                RT_pattern_list = []
+                RT_all_list = []
+                accs_in_block = []
+                first_trial_in_block = True
+
+            # resting periods and feedback   
+            if N in self.settings.get_fb_block():
+                                
+                with self.shared_data_lock:
+                    self.last_N = N - 1
+                    self.trial_phase = "before stimulus"
+                    self.last_RSI = - 1
+                
+                self.person_data.flush_data_to_output(self)
+                self.person_data.save_person_settings(self)
                 
                 self.resting_period(fixation_cross, self.settings)
                 
-            # if N in self.settings.get_fb_block():
-            #     # self.print_to_screen('Saving data...')
-            #     with self.shared_data_lock:
-            #         self.last_N = N - 1
-            #         self.trial_phase = "before stimulus"
-            #         self.last_RSI = - 1
+                whatnow = self.show_feedback(N, number_of_patterns, patternERR, responses_in_block,
+                                                accs_in_block, RT_all_list, RT_pattern_list)
                 
-            #     self.person_data.flush_data_to_output(self)
-            #     self.person_data.save_person_settings(self)
-                
-            #     whatnow = self.show_feedback(N, number_of_patterns, patternERR, responses_in_block,
-            #                                     accs_in_block, RT_all_list, RT_pattern_list)
-                
-            #     if whatnow == 'quit':
-            #         if N >= 1:
-            #             with self.shared_data_lock:
-            #                 self.last_N = N - 1
+                if whatnow == 'quit':
+                    if N >= 1:
+                        with self.shared_data_lock:
+                            self.last_N = N - 1
                             
-            #         self.quit_presentation()
+                    self.quit_presentation()
                 
-            #     patternERR = 0
-            #     responses_in_block = 0
-            #     RT_pattern_list = []
-            #     RT_all_list = []
-            #     accs_in_block = []
-            #     first_trial_in_block = True
+                patternERR = 0
+                responses_in_block = 0
+                RT_pattern_list = []
+                RT_all_list = []
+                accs_in_block = []
+                first_trial_in_block = True
             
             # end of the sessions (one run of the experiment script stops at the end of the current session)
             if N == self.end_at[N - 1]:
