@@ -53,4 +53,20 @@ for img in files_list:
         images.append(img)
 images.sort()
 
-fname = op.join(workdir_path, 'ASRT', 'stimuli', images[0])  
+fname = op.join(workdir_path, 'ASRT', 'stimuli', images[0])
+
+
+def get_fb_block(self):
+    """Returns with a list of numbers indicating when the feedback must be shown."""
+    
+    if self.fb_block == None:
+        self.fb_block = []
+    for i in range(1, self.blocks_in_session + 2, 80):
+        self.fb_block.append(i * (self.trials_in_block) + 1)
+
+fb = None
+if fb == None:
+    fb = []
+
+for i in range(1, 160 + 2, 80):
+    fb.append(i * 20 + 1)

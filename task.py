@@ -69,6 +69,7 @@ class ExperimentSettings:
         
         self.sessionstarts = None
         self.blockstarts = None
+        self.fb_block = None
 
         self.settings_file_path = settings_file_path
         self.reminder_file_path = reminder_file_path
@@ -196,11 +197,13 @@ class ExperimentSettings:
         return (self.trials_in_tBlock + self.trials_in_block) * self.blocks_in_session * self.numsessions #maybe scrap the training data trials
 
     def get_maxtrial2(self):
-        """Get number of all trials per session."""
+        """Get number of all trials per session, training included."""
 
         return self.trials_in_block * self.blocks_in_session + self.trials_in_tBlock
     
     def get_maxtrial3(self):
+        """Get number of all trials per session, training excluded."""
+
         return self.trials_in_block * self.blocks_in_session
 
     def get_block_starts(self):
@@ -209,11 +212,20 @@ class ExperimentSettings:
         if self.blockstarts == None:
             self.blockstarts = [1]
             for i in range(1, self.blocks_in_session + 2):
-                self.blockstarts.append(
-                    i * (self.trials_in_block) + 1)
-
+                self.blockstarts.append(i * (self.trials_in_block) + 1)
+        
         return self.blockstarts
-
+    
+    def get_fb_block(self):
+        """Returns with a list of numbers indicating when the feedback must be shown."""
+        
+        if self.fb_block == None:
+            self.fb_block = []
+            for i in range(1, self.get_maxtrial2() + 2, 80):
+                self.fb_block.append(i * (self.trials_in_block) + 1)
+        
+        return self.fb_block
+ 
     def get_session_starts(self):
         """Return with a list of numbers indicating the first trials of the different sessions."""
 
@@ -405,7 +417,7 @@ class InstructionHelper:
         self.__show_message(self.show_ending, experiment)
     
 
-    def feedback_implicit_RT(self, rt_mean, acc_for_the_whole, acc_for_the_whole_str, mywindow, expriment_settings):
+    def feedback_implicit_RT(self, rt_mean, acc_for_the_whole, acc_for_the_whole_str, mywindow, experiment_settings):
         """Display feedback screen in case of an implicit ASRT.
 
            The feedback string contains placeholders for reaction time and accuracy.
@@ -416,10 +428,10 @@ class InstructionHelper:
             i = i.replace('*MEANRT*', rt_mean)
             i = i.replace('*PERCACC*', acc_for_the_whole_str)
 
-            if expriment_settings.whether_warning is True:
-                if acc_for_the_whole > expriment_settings.speed_warning:
+            if experiment_settings.whether_warning is True:
+                if acc_for_the_whole > experiment_settings.speed_warning:
                     i = i.replace('*SPEEDACC*', self.feedback_speed[0])
-                elif acc_for_the_whole < expriment_settings.acc_warning:
+                elif acc_for_the_whole < experiment_settings.acc_warning:
                     i = i.replace('*SPEEDACC*', self.feedback_accuracy[0])
                 else:
                     i = i.replace('*SPEEDACC*', '')
@@ -427,8 +439,8 @@ class InstructionHelper:
                 i = i.replace('*SPEEDACC*', '')
 
             self.__print_to_screen(i, mywindow)
-            tempkey = event.waitKeys(keyList=expriment_settings.get_key_list())
-        if expriment_settings.key_quit in tempkey:
+            tempkey = event.waitKeys(keyList=experiment_settings.get_key_list())
+        if experiment_settings.key_quit in tempkey:
             return 'quit'
         else:
             return 'continue'
@@ -869,64 +881,6 @@ class Experiment: # class for running ASRT experiment
         
         return seq, stim_type
     
-    # def calculate_stim_properties_v0(self):
-    #     """Calculate all variables used during the trials before the presentation starts."""
-        
-    #     all_trial_Nr = 0
-    #     block_num = 0
-        
-    #     sessionsstarts = self.settings.get_session_starts()
-    #     for trial_num in range(1, self.settings.get_maxtrial3() + 1):
-    #         for session_num in range(1, len(sessionsstarts)):
-    #             if trial_num >= sessionsstarts[session_num - 1] and trial_num < sessionsstarts[session_num]:
-    #                 self.stim_sessionN[trial_num] = session_num
-    #                 self.end_at[trial_num] = sessionsstarts[session_num]
-
-    #     for block in range(1, self.settings.blocks_in_session + 1):
-
-    #         block_num += 1
-    #         current_trial_num = 0
-    
-    #         # training
-            
-    #         for train in range(1, self.settings.trials_in_tBlock + 1):
-    #             current_trial_num += 1
-                
-    #             all_trial_Nr += 1                
-    #             current_stim = random.choice([1, 2, 3, 4])
-    #             self.stimlist[all_trial_Nr] = current_stim
-    #             self.stimpr[all_trial_Nr] = "random"
-    #             self.stimtrial[all_trial_Nr] = current_trial_num
-    #             self.stimblock[all_trial_Nr] = block_num
-                                
-    #         # testing
-            
-    #         for test in range(1, self.settings.trials_in_block + 1):
-    #             current_trial_num += 1
-    #             all_trial_Nr += 1
-                
-    #             if self.settings.blocks_in_session < (self.settings.trials_in_block/2):
-    #                 current_stim = random.choice([1, 2, 3, 4])
-    #                 self.stimlist[all_trial_Nr] = current_stim
-    #                 self.stimpr[all_trial_Nr] = "random"
-    #                 self.stimtrial[all_trial_Nr] = current_trial_num
-    #                 self.stimblock[all_trial_Nr] = block_num
-                
-    #             else:
-                
-    #                 if self.settings.blocks_in_session < (self.settings.blocks_in_session/2):
-    #                     mod_pattern = 0
-    #                 else:
-    #                     mod_pattern = 1
-                    
-    #                 if current_trial_num > 2:
-    #                     current_stim = self.create_sequence()
-    #                     # current_stim = self.create_sequence(self.settings.current_session)[test]
-    #                     self.stimpr[all_trial_Nr] = "pattern"
-
-    #                 self.stimlist[all_trial_Nr] = current_stim
-    #                 self.stimtrial[all_trial_Nr] = current_trial_num
-    #                 self.stimblock[all_trial_Nr] = block_num
 
     def calculate_stim_properties(self):
         """Calculate all variables used during the trials before the presentation starts."""
@@ -1050,8 +1004,10 @@ class Experiment: # class for running ASRT experiment
         self.frame_rate = self.mywindow.getActualFrameRate()
 
     
-    def show_feedback_RT(self, N, number_of_patterns, patternERR, responses_in_block, accs_in_block, RT_all_list, RT_pattern_list):
+    def show_feedback(self, N, number_of_patterns, patternERR, responses_in_block, accs_in_block, RT_all_list, RT_pattern_list):
         """ Display feedback in the end of the blocks, showing some data about speed and accuracy."""
+
+        # make so feedback for all previous blocks and not previous one only
 
         acc_for_the_whole = 100 * float(responses_in_block - sum(accs_in_block)) / responses_in_block
         acc_for_the_whole_str = str(acc_for_the_whole)[0:5].replace('.', ',')
@@ -1076,6 +1032,23 @@ class Experiment: # class for running ASRT experiment
         self.person_data.append_to_output_file('userquit')
         core.wait(3)
         core.quit()
+    
+    def resting_period(self, fixation_cross, experiment):
+        """Resting time with eyes closed."""
+            
+        self.print_to_screen("Fermez vos yeux puis appuyez sur un bouton.")
+        tempkey = event.waitKeys(keyList=experiment.get_key_list())
+        
+        if experiment.key_quit in tempkey:
+            self.quit_presentation()
+        else:
+            self.mywindow.flip()
+            rest_time = core.CountdownTimer(self.settings.rest_time)
+            while rest_time.getTime() > 0:
+                fixation_cross.draw()
+                self.mywindow.flip()
+            self.print_to_screen("La tâche va reprendre.")
+            core.wait(3)
     
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
@@ -1181,7 +1154,6 @@ class Experiment: # class for running ASRT experiment
                 # self.mywindow.flip()
                 # RSI_clock.reset()
                 # RSI.start(self.settings.RSI_time)
-
                 
                 now = datetime.now()                
                 stim_RT_time = now.strftime('%H:%M:%S.%f')
@@ -1189,7 +1161,6 @@ class Experiment: # class for running ASRT experiment
                 stimRT = time_stamp
                 
                 responses_in_block += 1
-                
                 
                 # quit during the experiment
                 if response == -1:
@@ -1247,9 +1218,14 @@ class Experiment: # class for running ASRT experiment
                     N += 1
                     first_trial_in_block = False
                     break
+            
+            # resting periods
+            if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
                 
-            if N in self.settings.get_block_starts():
-                self.print_to_screen('Saving data...')
+                self.resting_period(fixation_cross, self.settings)
+                
+            if N in self.settings.get_fb_block():
+                # self.print_to_screen('Saving data...')
                 with self.shared_data_lock:
                     self.last_N = N - 1
                     self.trial_phase = "before stimulus"
@@ -1258,7 +1234,7 @@ class Experiment: # class for running ASRT experiment
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
                 
-                whatnow = self.show_feedback_RT(N, number_of_patterns, patternERR, responses_in_block,
+                whatnow = self.show_feedback(N, number_of_patterns, patternERR, responses_in_block,
                                                 accs_in_block, RT_all_list, RT_pattern_list)
                 
                 if whatnow == 'quit':
@@ -1282,6 +1258,7 @@ class Experiment: # class for running ASRT experiment
 
     def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise'):
         
+        # ensure all required folders are created, if not creates them
         ensure_dir(os.path.join(self.workdir_path, "logs"))
         ensure_dir(os.path.join(self.workdir_path, "settings"))
         ensure_dir(os.path.join(self.workdir_path, "sequences"))
