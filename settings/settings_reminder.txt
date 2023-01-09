@@ -1,0 +1,28 @@
+Settings
+/nMonitor Width: 	34,2
+Computer Name: 	local_cermep
+Response keys: 	h, j, k, l.
+Quit key: 	q
+Warning (speed, accuracy): 	False
+Speed warning at:	93
+Acc warning at:	91
+Sessions:	2
+Blocks per session: 	160
+Training Trials\Block:	20
+Trials\Block:	20
+RSI:	0,25
+Resting time: 	10,0
+
+The following settings are valid and applies for all persons
+
+The settings apply to experiments that are created from this folder,
+started with the script found here. If you want to apply other settings,
+copy asrt.py and the inst_and_feedback.txt file containing the instructions to a
+to another directory, and you can enter the desired other settings when starting that script.
+
+Make sure that you always start the script from the directory where it is suitable for you
+settings are saved.
+
+The settings can be changed by deleting the settings/settings file; at the same time the file
+deletion is not recommended due to later transparency. If you still decide to delete,
+copy this .txt file beforehand so that you can remember the previous settings if necessary.
