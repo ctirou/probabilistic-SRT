@@ -1,5 +1,5 @@
 
-from psychopy import visual, core, event, gui, monitors
+from psychopy import visual, core, event, gui, monitors, sound
 import shelve
 import random
 import codecs
@@ -1035,10 +1035,14 @@ class Experiment: # class for running ASRT experiment
     
     def resting_period(self, fixation_cross, experiment):
         """Resting time with eyes closed."""
+        
+        last = [l for l in range(1, int(self.settings.rest_time))][:3][::-1]
             
         self.print_to_screen("Fermez vos yeux puis appuyez sur un bouton.")
         tempkey = event.waitKeys(keyList=experiment.get_key_list())
         
+        s = sound.Sound(value="Csh", secs=1.0)
+                
         if experiment.key_quit in tempkey:
             self.quit_presentation()
         else:
@@ -1047,6 +1051,11 @@ class Experiment: # class for running ASRT experiment
             while rest_time.getTime() > 0:
                 fixation_cross.draw()
                 self.mywindow.flip()
+                s.play(when=rest_time.getTime == 3, loops=2)
+                # for f in last:
+                #     if rest_time.getTime() == f:
+                #         s.play()
+                    
             self.print_to_screen("La tâche va reprendre.")
             core.wait(3)
     
@@ -1220,36 +1229,37 @@ class Experiment: # class for running ASRT experiment
                     break
             
             # resting periods
-            if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
+            # if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
+            if N in self.settings.get_block_starts():
                 
                 self.resting_period(fixation_cross, self.settings)
                 
-            if N in self.settings.get_fb_block():
-                # self.print_to_screen('Saving data...')
-                with self.shared_data_lock:
-                    self.last_N = N - 1
-                    self.trial_phase = "before stimulus"
-                    self.last_RSI = - 1
+            # if N in self.settings.get_fb_block():
+            #     # self.print_to_screen('Saving data...')
+            #     with self.shared_data_lock:
+            #         self.last_N = N - 1
+            #         self.trial_phase = "before stimulus"
+            #         self.last_RSI = - 1
                 
-                self.person_data.flush_data_to_output(self)
-                self.person_data.save_person_settings(self)
+            #     self.person_data.flush_data_to_output(self)
+            #     self.person_data.save_person_settings(self)
                 
-                whatnow = self.show_feedback(N, number_of_patterns, patternERR, responses_in_block,
-                                                accs_in_block, RT_all_list, RT_pattern_list)
+            #     whatnow = self.show_feedback(N, number_of_patterns, patternERR, responses_in_block,
+            #                                     accs_in_block, RT_all_list, RT_pattern_list)
                 
-                if whatnow == 'quit':
-                    if N >= 1:
-                        with self.shared_data_lock:
-                            self.last_N = N - 1
+            #     if whatnow == 'quit':
+            #         if N >= 1:
+            #             with self.shared_data_lock:
+            #                 self.last_N = N - 1
                             
-                    self.quit_presentation()
+            #         self.quit_presentation()
                 
-                patternERR = 0
-                responses_in_block = 0
-                RT_pattern_list = []
-                RT_all_list = []
-                accs_in_block = []
-                first_trial_in_block = True
+            #     patternERR = 0
+            #     responses_in_block = 0
+            #     RT_pattern_list = []
+            #     RT_all_list = []
+            #     accs_in_block = []
+            #     first_trial_in_block = True
             
             # end of the sessions (one run of the experiment script stops at the end of the current session)
             if N == self.end_at[N - 1]:
