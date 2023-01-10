@@ -323,8 +323,6 @@ class InstructionHelper:
     def __init__(self, instructions_file_path):
         # instructions in the beginning of the experiment (might have more elements)
         self.insts = []
-        # feedback for the subject about speed and accuracy in the explicit asrt case (might be empty)
-        self.feedback_exp = []
         # feedback for the subject about speed and accuracy in the implicit asrt case
         self.feedback_imp = []
         # speed feedback line embedded into feedback_imp / feedback_exp
@@ -339,6 +337,10 @@ class InstructionHelper:
         self.instructions_file_path = instructions_file_path
 
     def read_insts_from_file(self):
+        """Read instruction strings from the instruction file using the special structure of this file.
+           Be aware of that line endings are preserved during reading instructions.
+        """
+        
         try:
             with codecs.open(self.instructions_file_path, 'r', encoding='utf-8') as inst_feedback:
                 all_inst_feedback = inst_feedback.read().split('***')
@@ -362,8 +364,8 @@ class InstructionHelper:
                     self.unexp_quit.append(all[1])
                             
     def validate_instructions(self, settings):
-        '''Do a minimal validation of the read instructions to get error messages early,
-           before a missing string actualy causes an issue.'''
+        """Do a minimal validation of the read instructions to get error messages early,
+           before a missing string actualy causes an issue."""
 
         if len(self.insts) == 0:
             print("Starting instruction was not specified!")
@@ -429,7 +431,7 @@ class InstructionHelper:
             i = i.replace('*PERCACC*', acc_for_the_whole_str)
 
             if experiment_settings.whether_warning is True:
-                if acc_for_the_whole > experiment_settings.speed_warning:
+                if rt_mean < experiment_settings.speed_warning:
                     i = i.replace('*SPEEDACC*', self.feedback_speed[0])
                 elif acc_for_the_whole < experiment_settings.acc_warning:
                     i = i.replace('*SPEEDACC*', self.feedback_accuracy[0])
@@ -1035,13 +1037,11 @@ class Experiment: # class for running ASRT experiment
     
     def resting_period(self, fixation_cross, experiment):
         """Resting time with eyes closed."""
-        
-        last = [l for l in range(1, int(self.settings.rest_time))][:3][::-1]
-            
+                    
         self.print_to_screen("Fermez vos yeux puis appuyez sur un bouton.")
         tempkey = event.waitKeys(keyList=experiment.get_key_list())
         
-        s = sound.Sound(value="Csh", secs=1.0)
+        s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
                 
         if experiment.key_quit in tempkey:
             self.quit_presentation()
@@ -1051,14 +1051,9 @@ class Experiment: # class for running ASRT experiment
             while rest_time.getTime() > 0:
                 fixation_cross.draw()
                 self.mywindow.flip()
-                s.play(when=rest_time.getTime == 3, loops=2)
-                # for f in last:
-                #     if rest_time.getTime() == f:
-                #         s.play()
-                    
-            self.print_to_screen("La tâche va reprendre.")
-            core.wait(3)
-    
+            core.wait(1)
+            s.play()
+                
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
         
@@ -1228,8 +1223,9 @@ class Experiment: # class for running ASRT experiment
                     first_trial_in_block = False
                     break
             
-            # resting periods
+            # # resting periods
             if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
+            # if N in self.settings.get_block_starts():
 
                 with self.shared_data_lock:
                     self.last_N = N - 1
@@ -1237,6 +1233,9 @@ class Experiment: # class for running ASRT experiment
                     self.last_RSI = - 1
                                 
                 self.resting_period(fixation_cross, self.settings)
+                self.person_data.flush_data_to_output(self)
+                self.person_data.save_person_settings(self)
+
                 
                 patternERR = 0
                 responses_in_block = 0
@@ -1245,8 +1244,9 @@ class Experiment: # class for running ASRT experiment
                 accs_in_block = []
                 first_trial_in_block = True
 
-            # resting periods and feedback   
-            if N in self.settings.get_fb_block():
+            # # resting periods and feedback   
+            if N in self.settings.get_fb_block()[1:]:
+            # if N in self.settings.get_block_starts():
                                 
                 with self.shared_data_lock:
                     self.last_N = N - 1
