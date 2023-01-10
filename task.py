@@ -421,27 +421,27 @@ class InstructionHelper:
            about the speed or accuray.
         """
         
-        timer = core.CountdownTimer(experiment_settings.rest_time)
-        while timer.getTime() < 0:
-            for i in self.feedback_imp:
-                i = i.replace('*MEANRT*', rt_mean)
-                i = i.replace('*PERCACC*', acc_for_the_whole_str)
+        for i in self.feedback_imp:
+            i = i.replace('*MEANRT*', rt_mean)
+            i = i.replace('*PERCACC*', acc_for_the_whole_str)
 
-                if experiment_settings.whether_warning is True:
-                    if rt_mean > experiment_settings.speed_warning:
-                        i = i.replace('COMMENT', 'Soyez plus rapide !')
-                    elif acc_for_the_whole < experiment_settings.acc_warning:
-                        i = i.replace('COMMENT', 'Soyez plus précis !')
-                    elif rt_mean > experiment_settings.speed_warning and acc_for_the_whole < experiment_settings.acc_warning:
-                        i = i.replace('COMMENT', 'Soyez plus rapide et précis !')
-                    else:
-                        i = i.replace('COMMENT', '')
+            if experiment_settings.whether_warning is True:
+                if rt_mean > experiment_settings.speed_warning:
+                    i = i.replace('COMMENT', 'Soyez plus rapide !')
+                elif acc_for_the_whole < experiment_settings.acc_warning:
+                    i = i.replace('COMMENT', 'Soyez plus précis !')
+                elif rt_mean > experiment_settings.speed_warning and acc_for_the_whole < experiment_settings.acc_warning:
+                    i = i.replace('COMMENT', 'Soyez plus rapide et précis !')
                 else:
                     i = i.replace('COMMENT', '')
-
+            else:
+                i = i.replace('COMMENT', '')
+            timer = core.CountdownTimer(experiment_settings.rest_time)
+            while timer.getTime() < 0:
                 self.__print_to_screen(i, mywindow)
+                experiment_settings.mywindow.flip()
                 # tempkey = event.waitKeys(keyList=experiment_settings.get_key_list())
-        
+    
         # if experiment_settings.key_quit in tempkey:
         #     return 'quit'
         # else:

@@ -48,6 +48,16 @@ Appuyez sur une touche pour lancer la tâche !
 
 ***
 
+feedback speed#
+Soyez plus rapide !
+
+***
+
+feedback accuracy#
+Soyez plus précis !
+
+***
+
 ending#
 
 L'expérience est terminée !
