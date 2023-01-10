@@ -37,7 +37,7 @@ class ExperimentSettings:
     
     def __init__(self, settings_file_path, reminder_file_path, sequence_file_path):
         
-        self.numsessions = None # number of sessions (2)
+        self.numsessions = 2 # number of sessions (2)
         self.current_session = None # current session
         
         self.blockprepN = None # number of trials in training block (20)
@@ -255,18 +255,20 @@ class ExperimentSettings:
 
         settings_dialog = gui.Dlg(title='Experiment design')
         settings_dialog.addText('No settings saved for this experiment yet...')
-        settings_dialog.addField('Number of sessions', 2)
+        settings_dialog.addField('Current session:', choices=['1st', '2nd'])
+        # settings_dialog.addField('Number of sessions', 2)
         settings_dialog.addField('Blocks per session', 160)
-        settings_dialog.addField('Trials in training block', 20)
-        settings_dialog.addField('Trials per testing block', 20)
-        settings_dialog.addField('Current session', 1)
+        settings_dialog.addField('Trials in training block', 5)
+        settings_dialog.addField('Trials per testing block', 5)
+        # settings_dialog.addField('Current session', 1)
         returned_data = settings_dialog.show()
         if settings_dialog.OK:
-            self.numsessions = returned_data[0]
+            self.current_session = returned_data[0]
+            # self.numsessions = returned_data[0]
             self.blocks_in_session = returned_data[1]
             self.trials_in_tBlock = returned_data[2]
             self.trials_in_block = returned_data[3]
-            self.current_session = returned_data[4]
+            # self.current_session = returned_data[4]
         else:
             core.quit()
 
@@ -378,12 +380,12 @@ class InstructionHelper:
             core.quit()
         if len(self.feedback_imp) == 0:
             print("Feedback message was not specified!")
-        if settings.whether_warning and len(self.feedback_speed) == 0:
-            print("Speed warning message was not specified, but warning is enabled in the settings!")
-            core.quit()
-        if settings.whether_warning and len(self.feedback_accuracy) == 0:
-            print("Accuracy warning message was not specified, but warning is enabled in the settings!")
-            core.quit()
+        # if settings.whether_warning and len(self.feedback_speed) == 0:
+        #     print("Speed warning message was not specified, but warning is enabled in the settings!")
+        #     core.quit()
+        # if settings.whether_warning and len(self.feedback_accuracy) == 0:
+        #     print("Accuracy warning message was not specified, but warning is enabled in the settings!")
+        #     core.quit()
             
     def __print_to_screen(self, mytext, mywindow):
         text_stim = visual.TextStim(mywindow, text=mytext, 
@@ -392,14 +394,6 @@ class InstructionHelper:
         text_stim.draw()
         mywindow.flip()
     
-    # def __print_to_screen(self, mytext, mywindow):
-    #     text_stim = visual.TextStim(mywindow, text=mytext, 
-    #                                 font='Times',
-    #                                 pos=(0,0), height=.1, wrapWidth=None, ori=0.0,
-    #                                 color='black', colorSpace='rgb', opacity=1, depth=0.0)
-                                    
-    #     text_stim.draw()
-    #     mywindow.flip()
     
     def __show_message(self, instruction_list, experiment):
         for inst in instruction_list:
@@ -426,26 +420,32 @@ class InstructionHelper:
            Based on the settings the feedback might contain extra warning
            about the speed or accuray.
         """
-        for i in self.feedback_imp:
-            i = i.replace('*MEANRT*', rt_mean)
-            i = i.replace('*PERCACC*', acc_for_the_whole_str)
+        
+        timer = core.CountdownTimer(experiment_settings.rest_time)
+        while timer.getTime() < 0:
+            for i in self.feedback_imp:
+                i = i.replace('*MEANRT*', rt_mean)
+                i = i.replace('*PERCACC*', acc_for_the_whole_str)
 
-            if experiment_settings.whether_warning is True:
-                if rt_mean < experiment_settings.speed_warning:
-                    i = i.replace('*SPEEDACC*', self.feedback_speed[0])
-                elif acc_for_the_whole < experiment_settings.acc_warning:
-                    i = i.replace('*SPEEDACC*', self.feedback_accuracy[0])
+                if experiment_settings.whether_warning is True:
+                    if rt_mean > experiment_settings.speed_warning:
+                        i = i.replace('COMMENT', 'Soyez plus rapide !')
+                    elif acc_for_the_whole < experiment_settings.acc_warning:
+                        i = i.replace('COMMENT', 'Soyez plus précis !')
+                    elif rt_mean > experiment_settings.speed_warning and acc_for_the_whole < experiment_settings.acc_warning:
+                        i = i.replace('COMMENT', 'Soyez plus rapide et précis !')
+                    else:
+                        i = i.replace('COMMENT', '')
                 else:
-                    i = i.replace('*SPEEDACC*', '')
-            else:
-                i = i.replace('*SPEEDACC*', '')
+                    i = i.replace('COMMENT', '')
 
-            self.__print_to_screen(i, mywindow)
-            tempkey = event.waitKeys(keyList=experiment_settings.get_key_list())
-        if experiment_settings.key_quit in tempkey:
-            return 'quit'
-        else:
-            return 'continue'
+                self.__print_to_screen(i, mywindow)
+                # tempkey = event.waitKeys(keyList=experiment_settings.get_key_list())
+        
+        # if experiment_settings.key_quit in tempkey:
+        #     return 'quit'
+        # else:
+        return 'continue'
 
 class PersonDataHandler:
     """Class for handle subject related settings and data."""
@@ -870,6 +870,7 @@ class Experiment: # class for running ASRT experiment
             
     def open_sequence(self):
         """Returns list of stimuli sequence for current session."""
+        
         try:
             data = pd.read_csv(f'{self.settings.sequence_file_path}/{str(self.subject_number).zfill(2)}_seq_{self.settings.current_session}.csv', 
                            sep=',', header=0, encoding='utf8')
@@ -1006,7 +1007,7 @@ class Experiment: # class for running ASRT experiment
         self.frame_rate = self.mywindow.getActualFrameRate()
 
     
-    def show_feedback(self, N, number_of_patterns, patternERR, responses_in_block, accs_in_block, RT_all_list, RT_pattern_list):
+    def show_feedback(self, N, responses_in_block, accs_in_block, RT_all_list):
         """ Display feedback in the end of the blocks, showing some data about speed and accuracy."""
 
         # make so feedback for all previous blocks and not previous one only
@@ -1073,17 +1074,11 @@ class Experiment: # class for running ASRT experiment
     
         responses_in_block = 0
         accs_in_block = []
-        
-        patternERR = 0
-        number_of_patterns = 0
-        
+                
         num_of_random = 0
         num_of_high = 0
         num_of_low = 0
-        
-        num_of_patterns = 0
-        RT_pattern_list = []
-        
+                
         RT_random_list = []
         RT_high_list = []
         RT_low_list = []
@@ -1151,14 +1146,6 @@ class Experiment: # class for running ASRT experiment
                 with self.shared_data_lock:
                     self.trial_phase = "after_reaction"
                 
-                # start of the RSI timer and offset of the stimulus
-                # stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]], pos=(0,0), units='pix', size=(500, 500),
-                #         opacity=0)
-                # stim.draw()
-                # self.mywindow.flip()
-                # RSI_clock.reset()
-                # RSI.start(self.settings.RSI_time)
-                
                 now = datetime.now()                
                 stim_RT_time = now.strftime('%H:%M:%S.%f')
                 stim_RT_date = now.strftime('%d/%m/%Y')
@@ -1223,10 +1210,28 @@ class Experiment: # class for running ASRT experiment
                     first_trial_in_block = False
                     break
             
-            # # resting periods
-            if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
-            # if N in self.settings.get_block_starts():
+            # # resting period only
+            # if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
+            # # if N in self.settings.get_block_starts():
 
+            #     with self.shared_data_lock:
+            #         self.last_N = N - 1
+            #         self.trial_phase = "before stimulus"
+            #         self.last_RSI = - 1
+                                
+            #     self.resting_period(fixation_cross, self.settings)
+            #     self.person_data.flush_data_to_output(self)
+            #     self.person_data.save_person_settings(self)
+
+            #     # responses_in_block = 0
+            #     # RT_all_list = [] # maybe don't reinitilize here
+            #     # accs_in_block = [] # same here
+            #     first_trial_in_block = True
+
+            # resting period and feedback   
+            # if N in self.settings.get_fb_block()[1:]:
+            if N in self.settings.get_block_starts():
+                                                
                 with self.shared_data_lock:
                     self.last_N = N - 1
                     self.trial_phase = "before stimulus"
@@ -1236,41 +1241,18 @@ class Experiment: # class for running ASRT experiment
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
+                timer = core.CountdownTimer(self.settings.rest_time)
+                while timer.getTime() > 0:
+                    whatnow = self.show_feedback(N, responses_in_block,
+                                                    accs_in_block, RT_all_list)   
+                    # self.mywindow.flip()     
+                    if whatnow == 'quit':
+                        if N >= 1:
+                            with self.shared_data_lock:
+                                self.last_N = N - 1  
+                        self.quit_presentation()
                 
-                patternERR = 0
                 responses_in_block = 0
-                RT_pattern_list = []
-                RT_all_list = []
-                accs_in_block = []
-                first_trial_in_block = True
-
-            # # resting periods and feedback   
-            if N in self.settings.get_fb_block()[1:]:
-            # if N in self.settings.get_block_starts():
-                                
-                with self.shared_data_lock:
-                    self.last_N = N - 1
-                    self.trial_phase = "before stimulus"
-                    self.last_RSI = - 1
-                
-                self.person_data.flush_data_to_output(self)
-                self.person_data.save_person_settings(self)
-                
-                self.resting_period(fixation_cross, self.settings)
-                
-                whatnow = self.show_feedback(N, number_of_patterns, patternERR, responses_in_block,
-                                                accs_in_block, RT_all_list, RT_pattern_list)
-                
-                if whatnow == 'quit':
-                    if N >= 1:
-                        with self.shared_data_lock:
-                            self.last_N = N - 1
-                            
-                    self.quit_presentation()
-                
-                patternERR = 0
-                responses_in_block = 0
-                RT_pattern_list = []
                 RT_all_list = []
                 accs_in_block = []
                 first_trial_in_block = True

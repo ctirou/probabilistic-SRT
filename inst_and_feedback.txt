@@ -35,11 +35,10 @@ Quand vous êtes prêt, appuyez sur une touche pour lancer la tâche !
 
 feedback#
 
-Maintenant, vous pouvez vous reposer un peu.
-
 Votre précision : *PERCACC* %
 Votre temps de réaction moyen : *MEANRT* secondes
-*SPEEDACC*
+
+COMMENT
 
 ***
 
