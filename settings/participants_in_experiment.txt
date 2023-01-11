@@ -1,2 +1,0 @@
-subject_name	subject_id	subject_sex	subject_age
-john-doe	01	male	18

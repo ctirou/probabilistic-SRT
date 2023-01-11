@@ -35,8 +35,8 @@ Quand vous êtes prêt, appuyez sur une touche pour lancer la tâche !
 
 feedback#
 
-Votre précision : *PERCACC* %
 Votre temps de réaction moyen : *MEANRT* secondes
+Votre précision : *PERCACC* %
 
 COMMENT
 
@@ -51,6 +51,8 @@ Appuyez sur une touche pour lancer la tâche !
 ending#
 
 L'expérience est terminée !
+
+Merci d'avoir participé(e).
 
 ***
 

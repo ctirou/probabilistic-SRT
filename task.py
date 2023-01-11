@@ -37,15 +37,9 @@ class ExperimentSettings:
     
     def __init__(self, settings_file_path, reminder_file_path, sequence_file_path):
         
-        self.numsessions = 2 # number of sessions (2)
+        self.numsessions = 2 # number of sessions
         self.current_session = None # current session
         
-        self.blockprepN = None # number of trials in training block (20)
-        self.blocklengthN = None # number of trials in testing blocks (20)
-        self.block_in_epochN = None # number of block in a session (160)
-        self.epochN = None
-        self.epochs = None
-
         self.blocks_in_session = None 
         self.trials_in_tBlock = None
         self.trials_in_block = None
@@ -88,12 +82,6 @@ class ExperimentSettings:
                 
                 self.numsessions = settings_file['numsessions']
                 
-                self.blockprepN = settings_file['blockprepN']
-                self.blocklengthN = settings_file['blocklengthN']
-                self.block_in_epochN = settings_file['block_in_epochN']
-                self.epochN = settings_file['epochN']
-                self.epochs = settings_file['epochs']
-
                 self.blocks_in_session = settings_file['blocks_in_session']
                 self.trials_in_tBlock = settings_file['trials_in_tBlock']
                 self.trials_in_block = settings_file['trials_in_block']
@@ -125,12 +113,6 @@ class ExperimentSettings:
         with shelve.open(self.settings_file_path, 'n') as settings_file:
             settings_file['numsessions'] = self.numsessions
             
-            settings_file['blockprepN'] = self.blockprepN
-            settings_file['blocklengthN'] = self.blocklengthN
-            settings_file['block_in_epochN'] = self.block_in_epochN
-            settings_file['epochN'] = self.epochN
-            settings_file['epochs'] = self.epochs
-
             settings_file['blocks_in_session'] = self.blocks_in_session
             settings_file['trials_in_tBlock'] = self.trials_in_tBlock
             settings_file['trial_in_block'] = self.trials_in_block
@@ -191,17 +173,12 @@ class ExperimentSettings:
 
             reminder_file.write(reminder)
 
-    def get_maxtrial(self):
-        """Get number of all trials in the whole experiment (in all sessions)."""
-
-        return (self.trials_in_tBlock + self.trials_in_block) * self.blocks_in_session * self.numsessions #maybe scrap the training data trials
-
-    def get_maxtrial2(self):
+    def maxtrial_traintest(self):
         """Get number of all trials per session, training included."""
 
         return self.trials_in_block * self.blocks_in_session + self.trials_in_tBlock
     
-    def get_maxtrial3(self):
+    def maxtrial_test(self):
         """Get number of all trials per session, training excluded."""
 
         return self.trials_in_block * self.blocks_in_session
@@ -221,7 +198,7 @@ class ExperimentSettings:
         
         if self.fb_block == None:
             self.fb_block = []
-            for i in range(1, self.get_maxtrial2() + 2, 80):
+            for i in range(1, self.maxtrial_traintest() + 2, 80):
                 self.fb_block.append(i * (self.trials_in_block) + 1)
         
         return self.fb_block
@@ -256,19 +233,18 @@ class ExperimentSettings:
         settings_dialog = gui.Dlg(title='Experiment design')
         settings_dialog.addText('No settings saved for this experiment yet...')
         settings_dialog.addField('Current session:', choices=['1st', '2nd'])
-        # settings_dialog.addField('Number of sessions', 2)
         settings_dialog.addField('Blocks per session', 160)
-        settings_dialog.addField('Trials in training block', 5)
-        settings_dialog.addField('Trials per testing block', 5)
-        # settings_dialog.addField('Current session', 1)
+        settings_dialog.addField('Trials in training block', 40)
+        settings_dialog.addField('Trials per testing block', 20)
         returned_data = settings_dialog.show()
         if settings_dialog.OK:
-            self.current_session = returned_data[0]
-            # self.numsessions = returned_data[0]
+            if returned_data[0] == '1st':
+                self.current_session = 1
+            else:
+                self.current_session = 2
             self.blocks_in_session = returned_data[1]
             self.trials_in_tBlock = returned_data[2]
             self.trials_in_block = returned_data[3]
-            # self.current_session = returned_data[4]
         else:
             core.quit()
 
@@ -276,10 +252,9 @@ class ExperimentSettings:
         """Ask the user specific information about the computer and also change display settings."""
 
         settings_dialog = gui.Dlg(title='Settings')
-        
         settings_dialog.addField('Monitor Width (cm)', 34.2)
         settings_dialog.addField('Computer name', 'local_cermep')
-        settings_dialog.addField('RSI (ms)', 250)
+        settings_dialog.addField('RSI (ms)', 120)
         settings_dialog.addField('Resting time (s)', 5)
 
         returned_data = settings_dialog.show()
@@ -327,10 +302,6 @@ class InstructionHelper:
         self.insts = []
         # feedback for the subject about speed and accuracy in the implicit asrt case
         self.feedback_imp = []
-        # speed feedback line embedded into feedback_imp / feedback_exp
-        self.feedback_speed = []
-        # accuracy feedback line embedded into feedback_imp / feedback_exp
-        self.feedback_accuracy = []
         # message in the end of the experiment
         self.ending = []
         # shown message when continuing sessions after the previous data recoding was quited
@@ -356,10 +327,6 @@ class InstructionHelper:
                     self.insts.append(all[1])
                 elif 'feedback' in all[0]:
                     self.feedback_imp.append(all[1])
-                elif 'speed' in all[0]:
-                    self.feedback_speed.append(all[1])
-                elif 'accuracy' in all[0]:
-                    self.feedback_accuracy.append(all[1])
                 elif 'ending' in all[0]:
                     self.ending.append(all[1])
                 elif 'unexpected quit' in all[0]:
@@ -380,16 +347,9 @@ class InstructionHelper:
             core.quit()
         if len(self.feedback_imp) == 0:
             print("Feedback message was not specified!")
-        # if settings.whether_warning and len(self.feedback_speed) == 0:
-        #     print("Speed warning message was not specified, but warning is enabled in the settings!")
-        #     core.quit()
-        # if settings.whether_warning and len(self.feedback_accuracy) == 0:
-        #     print("Accuracy warning message was not specified, but warning is enabled in the settings!")
-        #     core.quit()
             
     def __print_to_screen(self, mytext, mywindow):
-        text_stim = visual.TextStim(mywindow, text=mytext, 
-                                    font='Helvetica',
+        text_stim = visual.TextStim(mywindow, text=mytext,
                                     units='cm', height=0.8, wrapWidth=20, color='black')
         text_stim.draw()
         mywindow.flip()
@@ -413,7 +373,7 @@ class InstructionHelper:
         self.__show_message(self.show_ending, experiment)
     
 
-    def feedback_implicit_RT(self, rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, mywindow, experiment_settings):
+    def feedback_RT_acc(self, rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, mywindow, experiment_settings):
         """Display feedback screen in case of an implicit ASRT.
 
            The feedback string contains placeholders for reaction time and accuracy.
@@ -431,21 +391,13 @@ class InstructionHelper:
                 elif acc_for_the_whole < experiment_settings.acc_warning:
                     i = i.replace('COMMENT', 'Soyez plus précis !')
                 elif rt_mean > experiment_settings.speed_warning and acc_for_the_whole < experiment_settings.acc_warning:
-                    i = i.replace('COMMENT', 'Continuez ainsi !')
+                    i = i.replace('COMMENT', 'Soyez plus rapide et plus précis !')
                 else:
-                    i = i.replace('COMMENT', '')
+                    i = i.replace('COMMENT', 'Continuez ainsi !')
             else:
                 i = i.replace('COMMENT', '')
-            # timer = core.CountdownTimer(experiment_settings.rest_time)
-            # while timer.getTime() < 0:
+            
             self.__print_to_screen(i, mywindow)
-            # experiment_settings.mywindow.flip()
-        #     tempkey = event.waitKeys(keyList=experiment_settings.get_key_list())
-    
-        # if experiment_settings.key_quit in tempkey:
-        #     return 'quit'
-        # else:
-        #     return 'continue'
 
 class PersonDataHandler:
     """Class for handle subject related settings and data."""
@@ -711,7 +663,6 @@ class Experiment: # class for running ASRT experiment
         itsOK = False
         while not itsOK:
             settings_dialog = gui.Dlg(title='Settings')
-            settings_dialog.addText('')
             settings_dialog.addText(warningtext, color='Red')
             settings_dialog.addField('Name', "John Doe")
             settings_dialog.addField('Participant Number', str(1).zfill(2))
@@ -743,7 +694,7 @@ class Experiment: # class for running ASRT experiment
         """Dialog shown after restart of the experiment for a subject.
            Displays the state of the experiment for the given subject."""
 
-        if self.last_N + 1 <= self.settings.get_maxtrial():
+        if self.last_N + 1 <= self.settings.maxtrial_traintest():
             expstart11 = gui.Dlg(title='Starting task...')
             expstart11.addText("Already have participant's data")
             expstart11.addText('Continue from here...')
@@ -763,7 +714,6 @@ class Experiment: # class for running ASRT experiment
         """Select pattern sequences for the different sessions for the current subject."""
 
         settings_dialog = gui.Dlg(title='Settings')
-        settings_dialog.addText('')
         settings_dialog.addField('Sex', choices=["male", "female"])
         settings_dialog.addField('Age', "18")
         
@@ -792,7 +742,7 @@ class Experiment: # class for running ASRT experiment
         """Generates csv file with list of stimuli for current session."""
         
         keys = [1, 2, 3, 4]
-        trials = np.arange(self.settings.get_maxtrial3())
+        trials = np.arange(self.settings.maxtrial_traintest())
         random = int(len(trials)/2)
         data = pd.DataFrame({'trials': trials,
                     'trial_keys': np.zeros(len(trials), dtype=int),
@@ -865,8 +815,7 @@ class Experiment: # class for running ASRT experiment
                         data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2])]
                         data.trial_type.at[trial] = 'low_prob'
  
-        data.to_csv(f'{self.settings.sequence_file_path}/{str(self.subject_number).zfill(2)}_seq_{self.settings.current_session}.csv')
-        
+        data.to_csv(f'{self.settings.sequence_file_path}/{str(self.subject_number).zfill(2)}_seq_{self.settings.current_session}.csv')        
             
     def open_sequence(self):
         """Returns list of stimuli sequence for current session."""
@@ -888,13 +837,13 @@ class Experiment: # class for running ASRT experiment
     def calculate_stim_properties(self):
         """Calculate all variables used during the trials before the presentation starts."""
         
-        self.stimlist, self.stimpr = self.open_sequence()
+        (self.stimlist, self.stimpr) = self.open_sequence()
 
         all_trial_Nr = 0
         block_num = 0
         sessionsstarts = self.settings.get_session_starts()
         
-        for trial_num in range(1, self.settings.get_maxtrial3() + 1):
+        for trial_num in range(1, self.settings.maxtrial_test() + 1):
             for session_num in range(1, len(sessionsstarts)):
                 if trial_num >= sessionsstarts[session_num - 1] and trial_num < sessionsstarts[session_num]:
                     self.stim_sessionN[trial_num] = session_num
@@ -978,21 +927,11 @@ class Experiment: # class for running ASRT experiment
         """Display any string on the screen."""
 
         xtext = visual.TextStim(self.mywindow, text=mytext,
-                                font='Helvetica', 
                                 units="cm", height=0.8, wrapWidth=20, 
                                 color="black")
         xtext.draw()
         self.mywindow.flip()
 
-    # def print_to_screen(self, mytext):
-    #     """Display any string on the screen."""
-
-    #     xtext = visual.TextStim(self.mywindow, text=mytext, 
-    #                         font='Times',
-    #                         pos=(0,0), height=.1, wrapWidth=None, ori=0.0,
-    #                         color='black', colorSpace='rgb', opacity=1, depth=0.0)
-    #     xtext.draw()
-    #     self.mywindow.flip()
 
     def frame_check(self):
         """Measure the frame rate, using different measurements."""
@@ -1010,18 +949,15 @@ class Experiment: # class for running ASRT experiment
     def show_feedback(self, N, responses_in_block, accs_in_block, RT_all_list):
         """ Display feedback in the end of the blocks, showing some data about speed and accuracy."""
 
-        # make so feedback for all previous blocks and not previous one only
-
         acc_for_the_whole = 100 * float(responses_in_block - sum(accs_in_block)) / responses_in_block
         acc_for_the_whole_str = str(acc_for_the_whole)[0:5].replace('.', ',')
 
         rt_mean = float(sum(RT_all_list)) / len(RT_all_list)
         rt_mean_str = str(rt_mean)[:5].replace('.', ',')
 
-        whatnow = self.instructions.feedback_implicit_RT(
+        whatnow = self.instructions.feedback_RT_acc(
             rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
 
-        return whatnow
     
     def wait_for_response(self, expected_response, response_clock):
         press = event.waitKeys(keyList=self.settings.get_key_list(),
@@ -1049,11 +985,13 @@ class Experiment: # class for running ASRT experiment
         else:
             self.mywindow.flip()
             rest_time = core.CountdownTimer(self.settings.rest_time)
+            while rest_time.getTime() > 1:
+                fixation_cross.draw()
+                self.mywindow.flip()
+            s.play()
             while rest_time.getTime() > 0:
                 fixation_cross.draw()
                 self.mywindow.flip()
-            core.wait(1)
-            s.play()
                 
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
@@ -1211,26 +1149,21 @@ class Experiment: # class for running ASRT experiment
                     break
             
             # # resting period only
-            # if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
-            # # if N in self.settings.get_block_starts():
+            if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
 
-            #     with self.shared_data_lock:
-            #         self.last_N = N - 1
-            #         self.trial_phase = "before stimulus"
-            #         self.last_RSI = - 1
+                with self.shared_data_lock:
+                    self.last_N = N - 1
+                    self.trial_phase = "before stimulus"
+                    self.last_RSI = - 1
                                 
-            #     self.resting_period(fixation_cross, self.settings)
-            #     self.person_data.flush_data_to_output(self)
-            #     self.person_data.save_person_settings(self)
+                self.resting_period(fixation_cross, self.settings)
+                self.person_data.flush_data_to_output(self)
+                self.person_data.save_person_settings(self)
 
-            #     # responses_in_block = 0
-            #     # RT_all_list = [] # maybe don't reinitilize here
-            #     # accs_in_block = [] # same here
-            #     first_trial_in_block = True
+                first_trial_in_block = True
 
             # resting period and feedback   
-            # if N in self.settings.get_fb_block()[1:]:
-            if N in self.settings.get_block_starts():
+            if N in self.settings.get_fb_block()[1:]:
                                                 
                 with self.shared_data_lock:
                     self.last_N = N - 1
@@ -1243,14 +1176,7 @@ class Experiment: # class for running ASRT experiment
 
                 timer = core.CountdownTimer(self.settings.rest_time)
                 while timer.getTime() > 0:
-                    whatnow = self.show_feedback(N, responses_in_block,
-                                                    accs_in_block, RT_all_list)   
-                    # self.mywindow.flip()     
-                    # if whatnow == 'quit':
-                    #     if N >= 1:
-                    #         with self.shared_data_lock:
-                    #             self.last_N = N - 1  
-                    #     self.quit_presentation()
+                    self.show_feedback(N, responses_in_block,accs_in_block, RT_all_list)
                 
                 responses_in_block = 0
                 RT_all_list = []
