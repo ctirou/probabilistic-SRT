@@ -304,7 +304,7 @@ class ExperimentSettings:
         settings_dialog.addField('Right', 'k')
         settings_dialog.addField('Down', 'l')
         settings_dialog.addField('Quit', 'q')
-        settings_dialog.addField('Warning for accuracy/speed:', False)
+        settings_dialog.addField('Warning for accuracy/speed:', True)
         settings_dialog.addField('Warning for speed above this threshold (%):', 93)
         settings_dialog.addField('Warning accuracy below this threshold (%):', 91)
         returned_data = settings_dialog.show()
@@ -413,7 +413,7 @@ class InstructionHelper:
         self.__show_message(self.show_ending, experiment)
     
 
-    def feedback_implicit_RT(self, rt_mean, acc_for_the_whole, acc_for_the_whole_str, mywindow, experiment_settings):
+    def feedback_implicit_RT(self, rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, mywindow, experiment_settings):
         """Display feedback screen in case of an implicit ASRT.
 
            The feedback string contains placeholders for reaction time and accuracy.
@@ -422,7 +422,7 @@ class InstructionHelper:
         """
         
         for i in self.feedback_imp:
-            i = i.replace('*MEANRT*', rt_mean)
+            i = i.replace('*MEANRT*', rt_mean_str)
             i = i.replace('*PERCACC*', acc_for_the_whole_str)
 
             if experiment_settings.whether_warning is True:
@@ -431,21 +431,21 @@ class InstructionHelper:
                 elif acc_for_the_whole < experiment_settings.acc_warning:
                     i = i.replace('COMMENT', 'Soyez plus précis !')
                 elif rt_mean > experiment_settings.speed_warning and acc_for_the_whole < experiment_settings.acc_warning:
-                    i = i.replace('COMMENT', 'Soyez plus rapide et précis !')
+                    i = i.replace('COMMENT', 'Continuez ainsi !')
                 else:
                     i = i.replace('COMMENT', '')
             else:
                 i = i.replace('COMMENT', '')
-            timer = core.CountdownTimer(experiment_settings.rest_time)
-            while timer.getTime() < 0:
-                self.__print_to_screen(i, mywindow)
-                experiment_settings.mywindow.flip()
-                # tempkey = event.waitKeys(keyList=experiment_settings.get_key_list())
+            # timer = core.CountdownTimer(experiment_settings.rest_time)
+            # while timer.getTime() < 0:
+            self.__print_to_screen(i, mywindow)
+            # experiment_settings.mywindow.flip()
+        #     tempkey = event.waitKeys(keyList=experiment_settings.get_key_list())
     
         # if experiment_settings.key_quit in tempkey:
         #     return 'quit'
         # else:
-        return 'continue'
+        #     return 'continue'
 
 class PersonDataHandler:
     """Class for handle subject related settings and data."""
@@ -1019,7 +1019,7 @@ class Experiment: # class for running ASRT experiment
         rt_mean_str = str(rt_mean)[:5].replace('.', ',')
 
         whatnow = self.instructions.feedback_implicit_RT(
-            rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
+            rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
 
         return whatnow
     
@@ -1246,11 +1246,11 @@ class Experiment: # class for running ASRT experiment
                     whatnow = self.show_feedback(N, responses_in_block,
                                                     accs_in_block, RT_all_list)   
                     # self.mywindow.flip()     
-                    if whatnow == 'quit':
-                        if N >= 1:
-                            with self.shared_data_lock:
-                                self.last_N = N - 1  
-                        self.quit_presentation()
+                    # if whatnow == 'quit':
+                    #     if N >= 1:
+                    #         with self.shared_data_lock:
+                    #             self.last_N = N - 1  
+                    #     self.quit_presentation()
                 
                 responses_in_block = 0
                 RT_all_list = []

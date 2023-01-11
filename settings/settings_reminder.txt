@@ -3,7 +3,7 @@ Settings
 Computer Name: 	local_cermep
 Response keys: 	h, j, k, l.
 Quit key: 	q
-Warning (speed, accuracy): 	False
+Warning (speed, accuracy): 	True
 Speed warning at:	93
 Acc warning at:	91
 Sessions:	2
