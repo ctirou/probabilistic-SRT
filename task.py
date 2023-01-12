@@ -1,5 +1,7 @@
 
-from psychopy import visual, core, event, gui, monitors, sound
+from psychopy import visual, core, event, gui, monitors, sound, parallel
+from serial import Serial
+import time
 import shelve
 import random
 import codecs
@@ -13,6 +15,44 @@ import threading
 import os.path as op
 import pandas as pd
 import numpy as np
+
+parallel_port = False
+
+if parallel_port:
+    addressPortParallel = '0x3FE8'
+    port = parallel.ParallelPort(address=addressPortParallel)
+
+    # Start the MEG recordings
+    port.setData(0)
+    time.sleep(0.1)
+    port.setData(252)
+
+    # Stop MEG recordings
+    time.sleep(1)
+    port.setData(253)
+    time.sleep(1)
+    port.setData(0)
+    
+    # Serial port
+    # to read button presses from the button box
+
+    def serial_port(port='COM1', baudrate=9600, timeout=0):
+        """
+        Create serial port interface.
+
+        str port: Which port to interface with.
+        baudrate: Rate at which information is transferred in bits per second.
+        int timeout: Waiting time in seconds for the port to respond.
+        return: serial port interface
+        """
+        
+        open_port = Serial(port, baudrate, timeout=timeout)
+        open_port.close()
+        open_port = Serial(port, baudrate, timeout=timeout)
+        open_port.flush()
+        return open_port
+
+    port_s = serial_port()
 
 try:
     root = op.dirname(op.abspath(__file__))
@@ -46,7 +86,6 @@ class ExperimentSettings:
         
         self.monitor_width = None
         self.computer_name = None
-        self.stimulus_size = None
 
         self.RSI_time = None # response-to-next-stimulus in milliseconds
         self.rest_time = None # resting period duration in seconds
@@ -88,7 +127,6 @@ class ExperimentSettings:
 
                 self.monitor_width = settings_file['monitor_width']
                 self.computer_name = settings_file['computer_name']
-                self.stimulus_size = settings_file['stimulus_size']
                                 
                 self.RSI_time = settings_file['RSI_time']
                 self.rest_time = settings_file['rest_time']
@@ -119,7 +157,6 @@ class ExperimentSettings:
 
             settings_file['monitor_width'] = self.monitor_width
             settings_file['computer_name'] = self.computer_name
-            settings_file['stimulus_size'] = self.stimulus_size
             
             settings_file['RSI_time'] = self.RSI_time
             settings_file['rest_time'] = self.rest_time
@@ -1007,6 +1044,13 @@ class Experiment: # class for running ASRT experiment
         #                                   lineWidth=1.0, colorSpace='rgb',  lineColor='black', fillColor='black',
         #                                   opacity=1, depth=0.0, interpolate=True)
         
+        # Photodiode
+        
+        pixel = visual.Rect(win=self.mywindow, units='pix', 
+                            pos=(-self.mymonitor.getSizePix()[0], self.mymonitor.getSizePix()[1]/2),
+                            size=(self.mymonitor.getSizePix()*2/5, 200),
+                            fillColor='black', lineColor='black')
+        
         stim_RSI = 0.0
         N = self.last_N + 1
     
@@ -1047,7 +1091,9 @@ class Experiment: # class for running ASRT experiment
             
             fixation_cross.draw()
             stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[0]], pos=(0,0), units='pix', size=(128, 128))
+            pixel.setAutoDraw(True)
             self.mywindow.flip()
+            pixel.setAutoDraw(False)
 
             with self.shared_data_lock:
                 self.last_N = N - 1
@@ -1064,6 +1110,7 @@ class Experiment: # class for running ASRT experiment
                 
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]], pos=(0,0), units='pix', size=(128, 128))
                 stim.draw()
+                pixel.setAutoDraw(True)
                 fixation_cross.draw()
                 self.mywindow.flip()
                 
@@ -1101,6 +1148,7 @@ class Experiment: # class for running ASRT experiment
                 # correct response
                 elif response == self.stimlist[N]:
                     # start of the RSI timer and offset of the stimulus
+                    pixel.setAutoDraw(False)
                     stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]], pos=(0,0), units='pix', size=(128,128),
                         opacity=0)
                     stim.draw()
