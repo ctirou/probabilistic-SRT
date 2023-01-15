@@ -1,6 +1,7 @@
-
 from psychopy import visual, core, event, gui, monitors, sound, parallel
 from serial import Serial
+import pylink
+# import EyeLink
 import time
 import shelve
 import random
@@ -17,6 +18,7 @@ import pandas as pd
 import numpy as np
 
 parallel_port = False
+eye_track = False
 
 if parallel_port:
     addressPortParallel = '0x3FE8'
@@ -331,6 +333,13 @@ class ExperimentSettings:
             self.acc_warning = returned_data[7]
         else:
             core.quit()
+
+    def eyetrack_init(self, edfFileName):
+        screen = pyglet.canvas.get_display().get_default_screen()
+        selfEdf = EyeLink.tracker(screen.width, screen.height, edfFileName)
+        EyeLink.tracker.sendMessage(selfEdf, 'H')
+        EyeLink.tracker.close(selfEdf, edfFileName)
+
 
 class InstructionHelper:
     
