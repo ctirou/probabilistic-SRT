@@ -893,7 +893,7 @@ class Experiment:
                                 
             # testing
             
-            for test in range(1, self.settings.trials_in_block + 1):
+            for test in range(self.settings.trials_in_tBlock + 1, self.settings.trials_in_block + 1):
                 current_trial_num += 1
                 all_trial_Nr += 1
                                     
@@ -1193,7 +1193,7 @@ class Experiment:
                     first_trial_in_block = False
                     break
             
-            # # resting period only
+            # resting period only
             if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
 
                 with self.shared_data_lock:
