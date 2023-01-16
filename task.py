@@ -1,6 +1,6 @@
 from psychopy import visual, core, event, gui, monitors, sound, parallel
 from serial import Serial
-import pylink
+# import pylink
 # import EyeLink
 import time
 import shelve
@@ -73,8 +73,9 @@ def normalize_string(string, blank_char):
 
 
 class ExperimentSettings:
-    """This class handles all operation related to experiment settings.
-       These settings apply to all subjects in the specific experiment.
+    """
+        This class handles all operation related to experiment settings.
+        These settings apply to all subjects in the specific experiment.
     """    
     
     def __init__(self, settings_file_path, reminder_file_path, sequence_file_path):
@@ -334,11 +335,11 @@ class ExperimentSettings:
         else:
             core.quit()
 
-    def eyetrack_init(self, edfFileName):
-        screen = pyglet.canvas.get_display().get_default_screen()
-        selfEdf = EyeLink.tracker(screen.width, screen.height, edfFileName)
-        EyeLink.tracker.sendMessage(selfEdf, 'H')
-        EyeLink.tracker.close(selfEdf, edfFileName)
+    # def eyetrack_init(self, edfFileName):
+    #     screen = pyglet.canvas.get_display().get_default_screen()
+    #     selfEdf = EyeLink.tracker(screen.width, screen.height, edfFileName)
+    #     EyeLink.tracker.sendMessage(selfEdf, 'H')
+    #     EyeLink.tracker.close(selfEdf, edfFileName)
 
 
 class InstructionHelper:
@@ -628,7 +629,8 @@ class PersonDataHandler:
             output_file.write(h + '\t')
     
     
-class Experiment: # class for running ASRT experiment
+class Experiment: 
+    """ Class for running the experiment. """
 
     def __init__(self, workdir_path):
         # working directory of the experiment, the script reads settings and writer output under this directory
@@ -800,13 +802,13 @@ class Experiment: # class for running ASRT experiment
             for trial in trials:
                 if trial in np.arange(0, len(trials), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
-                    data.trial_type.at[trial] = 'No transition'
+                    data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(0, (self.settings.trials_in_tBlock + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
-                    data.trial_type.at[trial] = 'Training'
+                    data.trial_type.at[trial] = 'training'
                 elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + random)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
-                    data.trial_type.at[trial] = 'Random'                
+                    data.trial_type.at[trial] = 'random'                
                 else:
                     if data.trial_keys[trial-1] == keys[0]:
                         if np.random.random() < 2/3.:
@@ -832,13 +834,13 @@ class Experiment: # class for running ASRT experiment
             for trial in trials:
                 if trial in np.arange(0, len(trials), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
-                    data.trial_type.at[trial] = 'No transition'
+                    data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(0, (self.settings.trials_in_tBlock + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
-                    data.trial_type.at[trial] = 'Training'
+                    data.trial_type.at[trial] = 'training'
                 elif trial in np.arange((random + 1), len(trials)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
-                    data.trial_type.at[trial] = 'Random'
+                    data.trial_type.at[trial] = 'random'
                 else:
                     if data.trial_keys[trial-1] == keys[0]:
                         if np.random.random() < 2/3.:
@@ -1053,12 +1055,19 @@ class Experiment: # class for running ASRT experiment
         #                                   lineWidth=1.0, colorSpace='rgb',  lineColor='black', fillColor='black',
         #                                   opacity=1, depth=0.0, interpolate=True)
         
-        # Photodiode
-        
+        # Photodiode configuration
+        screen = pyglet.canvas.get_display().get_default_screen()
         pixel = visual.Rect(win=self.mywindow, units='pix', 
-                            pos=(-self.mymonitor.getSizePix()[0], self.mymonitor.getSizePix()[1]/2),
-                            size=(self.mymonitor.getSizePix()*2/5, 200),
+                            pos=(-screen.width, screen.height/2),
+                            size=(screen.height*2/5, 200),
                             fillColor='black', lineColor='black')
+        pixel.setAutoDraw(True)
+        del screen
+        
+        # negative feedback during training block
+        red = visual.Circle(win=self.mywindow, units='pix', radius=75,
+                            lineColor='red', fillColor='red',
+                            opacity=.75)
         
         stim_RSI = 0.0
         N = self.last_N + 1
@@ -1099,10 +1108,9 @@ class Experiment: # class for running ASRT experiment
         while True:
             
             fixation_cross.draw()
-            stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[0]], pos=(0,0), units='pix', size=(128, 128))
-            pixel.setAutoDraw(True)
+            stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[0]], 
+                                    pos=(0,0), units='pix', size=(128, 128), opacity=1)
             self.mywindow.flip()
-            pixel.setAutoDraw(False)
 
             with self.shared_data_lock:
                 self.last_N = N - 1
@@ -1117,9 +1125,9 @@ class Experiment: # class for running ASRT experiment
             while True: 
                 cycle += 1
                 
-                stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]], pos=(0,0), units='pix', size=(128, 128))
+                stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]], 
+                                        pos=(0,0), units='pix', size=(128, 128), opacity=1)
                 stim.draw()
-                pixel.setAutoDraw(True)
                 fixation_cross.draw()
                 self.mywindow.flip()
                 
@@ -1157,9 +1165,7 @@ class Experiment: # class for running ASRT experiment
                 # correct response
                 elif response == self.stimlist[N]:
                     # start of the RSI timer and offset of the stimulus
-                    pixel.setAutoDraw(False)
-                    stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]], pos=(0,0), units='pix', size=(128,128),
-                        opacity=0)
+                    stim.setOpacity(0)
                     stim.draw()
                     self.mywindow.flip()
                     RSI_clock.reset()
@@ -1175,13 +1181,15 @@ class Experiment: # class for running ASRT experiment
                     elif self.stimpr[N] == 'low_prob':
                         num_of_low += 1
                         RT_low_list.append(stimRT)
-                    RT_all_list.append(stimRT)
-
+                    RT_all_list.append(stimRT)             
+                
                 # wrong response --> let's wait for the next response
                 else:
                     stimACC = 1
                     accs_in_block.append(1)
-                    if self.stimpr[N] == 'random':
+                    if self.stimpr[N] == 'training':
+                        red.draw()
+                    elif self.stimpr[N] == 'random':
                         num_of_random += 1
                         RT_random_list.append(stimRT)
                         err_random += 1
@@ -1245,8 +1253,8 @@ class Experiment: # class for running ASRT experiment
                 self.print_to_screen('End of task. Thank you for participating!')
                 break
 
-    def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise'):
-        
+    def run(self, full_screen=False, mouse_visible=False, window_gammaErrorPolicy='raise'):
+    
         # ensure all required folders are created, if not creates them
         ensure_dir(os.path.join(self.workdir_path, "logs"))
         ensure_dir(os.path.join(self.workdir_path, "settings"))
@@ -1287,7 +1295,9 @@ class Experiment: # class for running ASRT experiment
 
         # init window
         self.monitor_settings()
-        with visual.Window(size=self.mymonitor.getSizePix(), color='Ivory', fullscr=False, monitor=self.mymonitor, units="pix", gammaErrorPolicy=window_gammaErrorPolicy) as self.mywindow:
+        with visual.Window(size=self.mymonitor.getSizePix(), color='Ivory', fullscr=False, 
+                           monitor=self.mymonitor, units="pix", gammaErrorPolicy=window_gammaErrorPolicy) as self.mywindow:
+            
             self.mywindow.mouseVisible = mouse_visible
 
             # check frame rate
