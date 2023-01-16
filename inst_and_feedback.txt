@@ -12,11 +12,12 @@ Appuyez sur une touche pour continuer !
 
 inst#
 
-Vous devez utiliser les clés suivantes :
+Vous devez utiliser les touches suivantes :
 
 H J K L
 
-Suivez les stimuli qui apparaissent le plus précisément et le plus rapidement possible !
+Appuyez sur les touches correspondantes aux images
+le plus précisément et le plus rapidement possible !
 
 Utilisez uniquement votre main droite.
 
@@ -26,10 +27,12 @@ Appuyez sur une touche pour continuer !
 
 inst#
 
-Vous recevrez des commentaires sur vos performances
-à la fin de chaque block - servez-vous en pour les améliorer !
+Vous recevrez régulièrement des commentaires sur vos performances 
+- servez-vous en pour les améliorer !
 
-Quand vous êtes prêt, appuyez sur une touche pour lancer la tâche !
+Vous commencerez par une phase d'entraînement.
+
+Quand vous êtes prêt(e), appuyez sur une touche pour lancer la tâche !
 
 ***
 
@@ -60,4 +63,23 @@ unexpected quit#
 
 La tâche s'est arrêtée de façon innatendue.
 
-Appuyez sur une touche pour continuer.
+Appuyez sur une touche pour continuer !
+
+***
+
+resting period#
+
+Fixez la croix de fixation au centre de l'écran.
+
+Régulièrement lors de la tâche vous pourrez vous reposer en fermant les yeux.
+
+Lorsque vous entenderez le son signifiant la fin de la pause, ouvrez les yeux et
+reprenez la tâche sans perdre de temps.
+
+***
+
+training end#
+
+L'entrainement est terminé.
+
+Appuyez sur une touche pour lancer la vraie tache !
