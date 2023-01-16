@@ -17,44 +17,23 @@ import os.path as op
 import pandas as pd
 import numpy as np
 
-parallel_port = False
-eye_track = False
 
-if parallel_port:
-    addressPortParallel = '0x3FE8'
-    port = parallel.ParallelPort(address=addressPortParallel)
+def serial_port(port='COM1', baudrate=9600, timeout=0):
+    """
+    Create serial port interface.
 
-    # Start the MEG recordings
-    port.setData(0)
-    time.sleep(0.1)
-    port.setData(252)
-
-    # Stop MEG recordings
-    time.sleep(1)
-    port.setData(253)
-    time.sleep(1)
-    port.setData(0)
+    str port: Which port to interface with.
+    baudrate: Rate at which information is transferred in bits per second.
+    int timeout: Waiting time in seconds for the port to respond.
+    return: serial port interface
+    """
     
-    # Serial port
-    # to read button presses from the button box
+    open_port = Serial(port, baudrate, timeout=timeout)
+    open_port.close()
+    open_port = Serial(port, baudrate, timeout=timeout)
+    open_port.flush()
+    return open_port
 
-    def serial_port(port='COM1', baudrate=9600, timeout=0):
-        """
-        Create serial port interface.
-
-        str port: Which port to interface with.
-        baudrate: Rate at which information is transferred in bits per second.
-        int timeout: Waiting time in seconds for the port to respond.
-        return: serial port interface
-        """
-        
-        open_port = Serial(port, baudrate, timeout=timeout)
-        open_port.close()
-        open_port = Serial(port, baudrate, timeout=timeout)
-        open_port.flush()
-        return open_port
-
-    port_s = serial_port()
 
 try:
     root = op.dirname(op.abspath(__file__))
@@ -947,6 +926,7 @@ class Experiment:
         if self.last_N > 0:
             # the current subject already started the experiment
             self.show_subject_continuation_dialog()
+            self.open_sequence()
         # we have a new subject
         else:
             # ask about the pattern codes used in the different sessions
@@ -954,7 +934,7 @@ class Experiment:
             # update participant attribute filesf
             self.person_data.update_all_subject_attributes_files(self.subject_sex, self.subject_age)
             # create sequence for current session
-            self.create_sequence()
+            self.open_sequence()
             # calculate stimulus properties for the experiment
             self.calculate_stim_properties()
             # save data of the new subject
@@ -1253,7 +1233,21 @@ class Experiment:
                 self.print_to_screen('End of task. Thank you for participating!')
                 break
 
-    def run(self, full_screen=False, mouse_visible=False, window_gammaErrorPolicy='raise'):
+    def run(self, full_screen=False, mouse_visible=False, window_gammaErrorPolicy='raise', parallel_port=False):
+        
+        if parallel_port:
+            addressPortParallel = '0x3FE8'
+            port = parallel.ParallelPort(address=addressPortParallel)
+
+            # Start the MEG recordings
+            port.setData(0)
+            time.sleep(0.1)
+            port.setData(252)
+            
+            # Serial port
+            # to read button presses from the button box
+            
+            port_s = serial_port()
     
         # ensure all required folders are created, if not creates them
         ensure_dir(os.path.join(self.workdir_path, "logs"))
@@ -1312,6 +1306,12 @@ class Experiment:
 
             # show ending screen
             self.instructions.show_ending(self)
+            
+            # Stop MEG recordings
+            time.sleep(1)
+            port.setData(253)
+            time.sleep(1)
+            port.setData(0)
 
 
 if __name__ == "__main__":
