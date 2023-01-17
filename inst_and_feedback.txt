@@ -19,6 +19,8 @@ H J K L
 Appuyez sur les touches correspondantes aux images
 le plus précisément et le plus rapidement possible !
 
+L'image suivante n'apparaîtra pas tant que vous que vous ne donnez pas la bonne réponse.
+
 Utilisez uniquement votre main droite.
 
 Appuyez sur une touche pour continuer !
@@ -39,7 +41,7 @@ reprenez la tâche sans perdre de temps.
 inst#
 
 Vous recevrez régulièrement des commentaires sur vos performances 
-- servez-vous en pour les améliorer !
+- servez-vous en pour vous améliorer !
 
 Vous commencerez par une phase d'entraînement.
 
