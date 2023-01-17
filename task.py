@@ -788,13 +788,13 @@ class Experiment:
         
         if self.settings.current_session == 1:
             for trial in trials:
-                if trial in np.arange((self.settings.trials_in_tBlock + 1), (len(trials) + 1), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock), (len(trials) + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
-                elif trial in np.arange(0, (self.settings.trials_in_tBlock + 1)):
+                elif trial in np.arange(0, (self.settings.trials_in_tBlock)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + random + 1)):
+                elif trial in np.arange((self.settings.trials_in_tBlock), (self.settings.trials_in_tBlock + random)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'                
                 else:
@@ -845,7 +845,7 @@ class Experiment:
                             data.trial_type.at[trial] = 'low_prob'
                     elif data.trial_keys[trial-1] == keys[3]:
                         if np.random.random() < 2/3:
-                            data.trial_keys_at[trial] = keys[2]
+                            data.trial_keys.at[trial] = keys[2]
                             data.trial_type.at[trial] = 'high_prob'
                         else:
                             data.trial_keys.at[trial] = keys[0]
@@ -854,7 +854,7 @@ class Experiment:
         data.to_csv(f'{self.settings.sequence_file_path}/{str(self.subject_number).zfill(2)}_seq_{self.settings.current_session}.csv')        
             
     def open_sequence(self):
-        """Returns list of stimuli sequence for current session."""
+        """Returns lists of stimuli sequence and type for current session."""
         
         try:
             data = pd.read_csv(f'{self.settings.sequence_file_path}/{str(self.subject_number).zfill(2)}_seq_{self.settings.current_session}.csv', 
@@ -879,7 +879,7 @@ class Experiment:
         block_num = 0
         sessionsstarts = self.settings.get_session_starts()
         
-        for trial_num in range(1, self.settings.maxtrial_test() + 1):
+        for trial_num in range(1, self.settings.maxtrial_traintest() + 1):
             for session_num in range(1, len(sessionsstarts)):
                 if trial_num >= sessionsstarts[session_num - 1] and trial_num < sessionsstarts[session_num]:
                     self.stim_sessionN[trial_num] = session_num
@@ -917,14 +917,15 @@ class Experiment:
         # unique subject ID
         subject_id = self.subject_name + '_' + str(self.subject_number).zfill(2)
 
-        # init subject data handler with the rigth file paths
+        # init subject data handler with the right file paths
         all_settings_file_path = os.path.join(self.workdir_path, "settings", subject_id)
         all_IDs_file_path = os.path.join(self.workdir_path, "settings", "participant_settings")
         sequence_file_path = os.path.join(self.workdir_path, "sequences", 
                                           str(self.subject_number) + '_seq' + str(self.settings.current_session) + '.csv')
         subject_list_file_path = os.path.join(self.workdir_path, "settings",
                                             "participants_in_experiment.txt")
-        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.txt')
+        # output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.txt')
+        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log' + str(self.settings.current_session)+ '.txt')
         self.person_data = PersonDataHandler(subject_id, all_settings_file_path,
                                             all_IDs_file_path, sequence_file_path, subject_list_file_path,
                                             output_file_path)
@@ -1043,24 +1044,22 @@ class Experiment:
         #                                   size=(1, 1), pos=(0, 0), anchor='center',
         #                                   lineWidth=1.0, colorSpace='rgb',  lineColor='black', fillColor='black',
         #                                   opacity=1, depth=0.0, interpolate=True)
-        
+    
+                
         # Photodiode configuration
         screen = pyglet.canvas.get_display().get_default_screen()
         pixel = visual.Rect(win=self.mywindow, units='pix', 
-                            pos=(-screen.width, screen.height/2),
-                            size=(screen.height*2/5, 200),
+                            pos=(-screen.height, screen.height/2),
+                            size=(screen.width*2/5, 200),
                             fillColor='black', lineColor='black')
-        # pixel = visual.Rect(win=self.mywindow, units='pix', 
-        #                     pos=(0,0),
-        #                     size=(100, 100),
-        #                     fillColor='black', lineColor='black')
-        pixel.setAutoDraw(True) # set to True/False to activate/deactivate the photodiode
+        pixel.setAutoDraw(False) # set to True/False to activate/deactivate the photodiode
         del screen
         
         # negative feedback during training block
-        red = visual.Circle(win=self.mywindow, units='pix', radius=75,
+        red = visual.Circle(win=self.mywindow, units='pix', radius=65,
                             lineColor='red', fillColor='red',
-                            opacity=.75)
+                            opacity=.50)
+        
         
         stim_RSI = 0.0
         N = self.last_N + 1
@@ -1181,7 +1180,11 @@ class Experiment:
                     stimACC = 1
                     accs_in_block.append(1)
                     if self.stimpr[N] == 'training':
-                        red.draw()
+                        timer = core.CountdownTimer(.2)
+                        while timer.getTime() > 0:
+                            fixation_cross.draw()
+                            red.draw()
+                            self.mywindow.flip()
                     elif self.stimpr[N] == 'random':
                         num_of_random += 1
                         RT_random_list.append(stimRT)
@@ -1250,11 +1253,13 @@ class Experiment:
                     core.quit()
             
             # end of the sessions (one run of the experiment script stops at the end of the current session)
-            if N == self.end_at[N - 1]:
+            # if N == self.end_at[N - 1]:
+            if N == (len(self.stimlist) - 1):    
                 self.print_to_screen("Fin de la tâche. Merci d'avoir participé.")
+                core.wait(60)
                 break
 
-    def run(self, full_screen=False, mouse_visible=False, window_gammaErrorPolicy='raise', 
+    def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise', 
             parallel_port=False,
             eyetrack=False):
         
