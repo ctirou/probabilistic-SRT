@@ -332,6 +332,8 @@ class InstructionHelper:
         self.ending = []
         # shown message when continuing sessions after the previous data recoding was quited
         self.unexp_quit = []
+        # shown message when the training has ended
+        self.train_end = []
 
         self.instructions_file_path = instructions_file_path
 
@@ -351,6 +353,8 @@ class InstructionHelper:
             if len(all) >= 2:
                 if 'inst' in all[0]:
                     self.insts.append(all[1])
+                elif 'training' in all[0]:
+                    self.train_end.append(all[1])
                 elif 'feedback' in all[0]:
                     self.feedback_imp.append(all[1])
                 elif 'ending' in all[0]:
@@ -364,6 +368,9 @@ class InstructionHelper:
 
         if len(self.insts) == 0:
             print("Starting instruction was not specified!")
+            core.quit()
+        if len(self.train_end) == 0:
+            print("Training end message was not specified!")
             core.quit()
         if len(self.ending) == 0:
             print("Ending message was not specified!")
@@ -388,9 +395,11 @@ class InstructionHelper:
             if experiment.settings.key_quit in tempkey:
                 core.quit()
     
-
     def show_instructions(self, experiment):
         self.__show_message(self.insts, experiment)
+    
+    def show_training_end(self, experiment):
+        self.__show_message(self.training_end, experiment)
     
     def show_unexp_quit(self, experiment):
         self.__show_message(self.unexp_quit, experiment)
@@ -893,7 +902,7 @@ class Experiment:
                                 
             # testing
             
-            for test in range(self.settings.trials_in_tBlock + 1, self.settings.trials_in_block + 1):
+            for test in range(self.settings.trials_in_tBlock + 1, self.settings.maxtrial_traintest() + 1):
                 current_trial_num += 1
                 all_trial_Nr += 1
                                     
@@ -1037,11 +1046,15 @@ class Experiment:
         
         # Photodiode configuration
         screen = pyglet.canvas.get_display().get_default_screen()
+        # pixel = visual.Rect(win=self.mywindow, units='pix', 
+        #                     pos=(-screen.width, screen.height/2),
+        #                     size=(screen.height*2/5, 200),
+        #                     fillColor='black', lineColor='black')
         pixel = visual.Rect(win=self.mywindow, units='pix', 
-                            pos=(-screen.width, screen.height/2),
-                            size=(screen.height*2/5, 200),
+                            pos=(0,0),
+                            size=(100, 100),
                             fillColor='black', lineColor='black')
-        pixel.setAutoDraw(True)
+        pixel.setAutoDraw(True) # set to True/False to activate/deactivate the photodiode
         del screen
         
         # negative feedback during training block
@@ -1228,12 +1241,22 @@ class Experiment:
                 accs_in_block = []
                 first_trial_in_block = True
             
+            # end of training
+            if N == (self.settings.trials_in_tBlock + 1):
+                self.instructions.show_training_end(self)
+                self.print_to_screen("Fin de l'entraînement. \n\n Appuyez sur une touche pour lancer la vraie tache !")
+                press = event.waitKeys(keyList=self.settings.get_key_list())
+                if self.settings.key_quit in press:
+                    core.quit()
+            
             # end of the sessions (one run of the experiment script stops at the end of the current session)
             if N == self.end_at[N - 1]:
-                self.print_to_screen('End of task. Thank you for participating!')
+                self.print_to_screen("Fin de la tâche. Merci d'avoir participé.")
                 break
 
-    def run(self, full_screen=False, mouse_visible=False, window_gammaErrorPolicy='raise', parallel_port=False):
+    def run(self, full_screen=False, mouse_visible=False, window_gammaErrorPolicy='raise', 
+            parallel_port=False,
+            eyetrack=False):
         
         if parallel_port:
             addressPortParallel = '0x3FE8'
@@ -1246,7 +1269,6 @@ class Experiment:
             
             # Serial port
             # to read button presses from the button box
-            
             port_s = serial_port()
     
         # ensure all required folders are created, if not creates them
@@ -1307,11 +1329,12 @@ class Experiment:
             # show ending screen
             self.instructions.show_ending(self)
             
-            # Stop MEG recordings
-            time.sleep(1)
-            port.setData(253)
-            time.sleep(1)
-            port.setData(0)
+            if parallel_port:
+                # Stop MEG recordings
+                time.sleep(1)
+                port.setData(253)
+                time.sleep(1)
+                port.setData(0)
 
 
 if __name__ == "__main__":
