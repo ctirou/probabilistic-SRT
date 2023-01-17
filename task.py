@@ -778,17 +778,18 @@ class Experiment:
         """Generates csv file with list of stimuli for current session."""
         
         keys = [1, 2, 3, 4]
-        trials = np.arange(self.settings.maxtrial_test())
-        random = int(len(trials)/2)
+        trials = np.arange(self.settings.maxtrial_traintest())
+        tests = self.settings.trials_in_block
+        random = tests/2
         data = pd.DataFrame({'trials': trials,
-                    'trial_keys': np.zeros(len(trials), dtype=int),
-                    'trial_type': ['to_define']*len(trials)})
+                             'trial_keys': np.zeros(len(trials), dtype=int),
+                             'trial_type': ['to_define']*len(trials)})
 
         np.random.shuffle(keys)
         
         if self.settings.current_session == 1:
             for trial in trials:
-                if trial in np.arange((self.settings.trials_in_tBlock), (len(trials) + 1), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock), (tests + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(0, (self.settings.trials_in_tBlock)):
@@ -820,13 +821,13 @@ class Experiment:
                             data.trial_type.at[trial] = 'low_prob'
         else:
             for trial in trials:
-                if trial in np.arange((self.settings.trials_in_tBlock + 1), (len(trials) + 1), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock + 1), (tests + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(0, (self.settings.trials_in_tBlock + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((random + 1), (len(trials) + 1)):
+                elif trial in np.arange((random + 1), (tests + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
                 else:
@@ -1245,7 +1246,7 @@ class Experiment:
                 first_trial_in_block = True
             
             # end of training
-            if N == (self.settings.trials_in_tBlock + 1):
+            if N == (self.settings.trials_in_tBlock):
                 # self.instructions.show_training_end(self)
                 self.print_to_screen("Fin de l'entraînement. \n\n Appuyez sur une touche pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
@@ -1253,10 +1254,10 @@ class Experiment:
                     core.quit()
             
             # end of the sessions (one run of the experiment script stops at the end of the current session)
-            # if N == self.end_at[N - 1]:
-            if N == (len(self.stimlist) - 1):    
+            if N == self.end_at[N - 1]:
+            # if N == (len(self.stimlist) - 1):    
                 self.print_to_screen("Fin de la tâche. Merci d'avoir participé.")
-                core.wait(60)
+                core.wait(5)
                 break
 
     def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise', 
