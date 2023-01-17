@@ -778,7 +778,7 @@ class Experiment:
         """Generates csv file with list of stimuli for current session."""
         
         keys = [1, 2, 3, 4]
-        trials = np.arange(self.settings.maxtrial_traintest())
+        trials = np.arange(self.settings.maxtrial_test())
         random = int(len(trials)/2)
         data = pd.DataFrame({'trials': trials,
                     'trial_keys': np.zeros(len(trials), dtype=int),
@@ -788,68 +788,68 @@ class Experiment:
         
         if self.settings.current_session == 1:
             for trial in trials:
-                if trial in np.arange(0, len(trials), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock + 1), (len(trials) + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(0, (self.settings.trials_in_tBlock + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + random)):
+                elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + random + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'                
                 else:
                     if data.trial_keys[trial-1] == keys[0]:
-                        if np.random.random() < 2/3.:
-                            data.trial_keys.at[trial] = keys[1]
-                            data.trial_type.at[trial] = 'high_prob'
-                        else:
-                            data.trial_keys.at[trial] = keys[np.random.choice([2, 3])]
-                            data.trial_type.at[trial] = 'low_prob'
+                        data.trial_keys.at[trial] = keys[1]
+                        data.trial_type.at[trial] = 'deterministic'
                     elif data.trial_keys[trial-1] == keys[1]:
                         data.trial_keys.at[trial] = keys[np.random.choice([0, 2, 3])]
-                        data.trial_type.at[trial] = 'low_prob'
+                        data.trial_type.at[trial] = 'pseudo-random'
                     elif data.trial_keys[trial-1] == keys[2]:
                         if np.random.random() < 2/3.:
                             data.trial_keys.at[trial] = keys[3]
                             data.trial_type.at[trial] = 'high_prob'
                         else:
-                            data.trial_keys[trial] = keys[np.random.choice([0, 1])]
+                            data.trial_keys.at[trial] = keys[0]
                             data.trial_type.at[trial] = 'low_prob'
                     elif data.trial_keys[trial-1] == keys[3]:
-                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2])]
-                        data.trial_type.at[trial] = 'low_prob'         
+                        if np.random.random() < 2/3:
+                            data.trial_keys.at[trial] = keys[2]
+                            data.trial_type.at[trial] = 'high_prob'
+                        else:
+                            data.trial_keys.at[trial] = keys[0]
+                            data.trial_type.at[trial] = 'low_prob'
         else:
             for trial in trials:
-                if trial in np.arange(0, len(trials), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock + 1), (len(trials) + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(0, (self.settings.trials_in_tBlock + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((random + 1), len(trials)):
+                elif trial in np.arange((random + 1), (len(trials) + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
                 else:
                     if data.trial_keys[trial-1] == keys[0]:
-                        if np.random.random() < 2/3.:
-                            data.trial_keys.at[trial] = keys[1]
-                            data.trial_type.at[trial] = 'high_prob'
-                        else:
-                            data.trial_keys.at[trial] = keys[np.random.choice([2, 3])]
-                            data.trial_type.at[trial] = 'low_prob'
+                        data.trial_keys.at[trial] = keys[1]
+                        data.trial_type.at[trial] = 'deterministic'
                     elif data.trial_keys[trial-1] == keys[1]:
                         data.trial_keys.at[trial] = keys[np.random.choice([0, 2, 3])]
-                        data.trial_type.at[trial] = 'low_prob'
+                        data.trial_type.at[trial] = 'pseudo-random'
                     elif data.trial_keys[trial-1] == keys[2]:
                         if np.random.random() < 2/3.:
                             data.trial_keys.at[trial] = keys[3]
                             data.trial_type.at[trial] = 'high_prob'
                         else:
-                            data.trial_keys[trial] = keys[np.random.choice([0, 1])]
+                            data.trial_keys.at[trial] = keys[0]
                             data.trial_type.at[trial] = 'low_prob'
                     elif data.trial_keys[trial-1] == keys[3]:
-                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2])]
-                        data.trial_type.at[trial] = 'low_prob'
+                        if np.random.random() < 2/3:
+                            data.trial_keys_at[trial] = keys[2]
+                            data.trial_type.at[trial] = 'high_prob'
+                        else:
+                            data.trial_keys.at[trial] = keys[0]
+                            data.trial_type.at[trial] = 'low_prob'
  
         data.to_csv(f'{self.settings.sequence_file_path}/{str(self.subject_number).zfill(2)}_seq_{self.settings.current_session}.csv')        
             
@@ -1046,14 +1046,14 @@ class Experiment:
         
         # Photodiode configuration
         screen = pyglet.canvas.get_display().get_default_screen()
-        # pixel = visual.Rect(win=self.mywindow, units='pix', 
-        #                     pos=(-screen.width, screen.height/2),
-        #                     size=(screen.height*2/5, 200),
-        #                     fillColor='black', lineColor='black')
         pixel = visual.Rect(win=self.mywindow, units='pix', 
-                            pos=(0,0),
-                            size=(100, 100),
+                            pos=(-screen.width, screen.height/2),
+                            size=(screen.height*2/5, 200),
                             fillColor='black', lineColor='black')
+        # pixel = visual.Rect(win=self.mywindow, units='pix', 
+        #                     pos=(0,0),
+        #                     size=(100, 100),
+        #                     fillColor='black', lineColor='black')
         pixel.setAutoDraw(True) # set to True/False to activate/deactivate the photodiode
         del screen
         
@@ -1243,7 +1243,7 @@ class Experiment:
             
             # end of training
             if N == (self.settings.trials_in_tBlock + 1):
-                self.instructions.show_training_end(self)
+                # self.instructions.show_training_end(self)
                 self.print_to_screen("Fin de l'entraînement. \n\n Appuyez sur une touche pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
                 if self.settings.key_quit in press:

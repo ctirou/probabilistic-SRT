@@ -6,7 +6,7 @@ Sur l'écran, vous verrez quatre images apparaître une à la fois.
 
 Votre tâche consiste à appuyer sur la touche correspondante à l'image qui vient d'apparaître.
 
-Appuyez sur une touche pour continuer !
+Appuyez sur une touche pour continuer.
 
 ***
 
@@ -23,7 +23,7 @@ L'image suivante n'apparaîtra pas tant que vous que vous ne donnez pas la bonne
 
 Utilisez uniquement votre main droite.
 
-Appuyez sur une touche pour continuer !
+Appuyez sur une touche pour continuer.
 
 ***
 
@@ -31,10 +31,12 @@ inst#
 
 Fixez la croix de fixation au centre de l'écran.
 
-Régulièrement lors de la tâche vous pourrez vous reposer en fermant les yeux.
+Régulièrement lors de la tâche, vous pourrez vous reposer en fermant les yeux.
 
 Lorsque vous entenderez le son signifiant la fin de la pause, ouvrez les yeux et
 reprenez la tâche sans perdre de temps.
+
+Appuyez sur une touche pour continuer.
 
 ***
 
