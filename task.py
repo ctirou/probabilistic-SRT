@@ -193,12 +193,12 @@ class ExperimentSettings:
             reminder_file.write(reminder)
 
     def maxtrial_traintest(self):
-        """Get number of all trials per session, training included."""
+        """Get total number of trials per session, training included."""
 
         return self.trials_in_block * self.blocks_in_session + self.trials_in_tBlock
     
     def maxtrial_test(self):
-        """Get number of all trials per session, training excluded."""
+        """Get total number of trials per session, training excluded."""
 
         return self.trials_in_block * self.blocks_in_session
 
@@ -779,8 +779,7 @@ class Experiment:
         
         keys = [1, 2, 3, 4]
         trials = np.arange(self.settings.maxtrial_traintest())
-        tests = self.settings.trials_in_block
-        random = tests/2
+        half_test = (self.settings.maxtrial_test())/2
         data = pd.DataFrame({'trials': trials,
                              'trial_keys': np.zeros(len(trials), dtype=int),
                              'trial_type': ['to_define']*len(trials)})
@@ -789,13 +788,13 @@ class Experiment:
         
         if self.settings.current_session == 1:
             for trial in trials:
-                if trial in np.arange((self.settings.trials_in_tBlock), (tests + 1), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock), (len(trials) + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(0, (self.settings.trials_in_tBlock)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((self.settings.trials_in_tBlock), (self.settings.trials_in_tBlock + random)):
+                elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + half_test)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'                
                 else:
@@ -821,13 +820,13 @@ class Experiment:
                             data.trial_type.at[trial] = 'low_prob'
         else:
             for trial in trials:
-                if trial in np.arange((self.settings.trials_in_tBlock + 1), (tests + 1), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock), (len(trials) + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
-                elif trial in np.arange(0, (self.settings.trials_in_tBlock + 1)):
+                elif trial in np.arange(0, (self.settings.trials_in_tBlock)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((random + 1), (tests + 1)):
+                elif trial in np.arange((self.settings.trials_in_tBlock + half_test + 1), (len(trials))):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
                 else:
@@ -926,7 +925,7 @@ class Experiment:
         subject_list_file_path = os.path.join(self.workdir_path, "settings",
                                             "participants_in_experiment.txt")
         # output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.txt')
-        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log' + str(self.settings.current_session)+ '.txt')
+        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log_' + str(self.settings.current_session)+ '.txt')
         self.person_data = PersonDataHandler(subject_id, all_settings_file_path,
                                             all_IDs_file_path, sequence_file_path, subject_list_file_path,
                                             output_file_path)
