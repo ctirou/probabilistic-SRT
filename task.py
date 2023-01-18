@@ -217,8 +217,8 @@ class ExperimentSettings:
         
         if self.fb_block == None:
             self.fb_block = []
-            for i in range(1, self.maxtrial_traintest() + 2, 80):
-                self.fb_block.append(i * (self.trials_in_block) + 1)
+            for i in range(self.trials_in_tBlock, (self.maxtrial_traintest() + 1), (self.trials_in_block * 4)):
+                self.fb_block.append(i + 1)
         
         return self.fb_block
  
@@ -261,7 +261,7 @@ class ExperimentSettings:
                 self.current_session = 1
             else:
                 self.current_session = 2
-            self.blocks_in_session = returned_data[1]
+            self.blocks_in_session = returned_data[1] + 1 # test blocks + training block
             self.trials_in_tBlock = returned_data[2]
             self.trials_in_block = returned_data[3]
         else:
@@ -701,7 +701,7 @@ class Experiment:
             settings_dialog = gui.Dlg(title='Settings')
             settings_dialog.addText(warningtext, color='Red')
             settings_dialog.addField('Name', "John Doe")
-            settings_dialog.addField('Participant Number', str(1).zfill(2))
+            settings_dialog.addField('Participant number', str(1).zfill(2))
 
             returned_data = settings_dialog.show()
             if settings_dialog.OK:
@@ -1068,15 +1068,18 @@ class Experiment:
         accs_in_block = []
                 
         num_of_random = 0
+        num_of_deter = 0
         num_of_high = 0
         num_of_low = 0
                 
         RT_random_list = []
+        RT_deter_list = []
         RT_high_list = []
         RT_low_list = []
         RT_all_list = []
         
         err_random = 0
+        err_deter = 0
         err_high = 0
         err_low = 0
         err_all = 0
@@ -1167,6 +1170,9 @@ class Experiment:
                     if self.stimpr[N] == 'random':
                         num_of_random += 1
                         RT_random_list.append(stimRT)
+                    elif self.stimpr[N] == 'deterministic':
+                        num_of_deter += 1
+                        RT_deter_list.append(stimRT)
                     elif self.stimpr[N] == 'high_prob':
                         num_of_high += 1
                         RT_high_list.append(stimRT)
@@ -1189,6 +1195,10 @@ class Experiment:
                         num_of_random += 1
                         RT_random_list.append(stimRT)
                         err_random += 1
+                    elif self.stimpr[N] == 'deterministic':
+                        num_of_deter += 1
+                        RT_deter_list.append(stimRT)
+                        err_deter += 1
                     elif self.stimpr[N] == 'high_prob':
                         num_of_high += 1
                         RT_high_list.append(stimRT)
@@ -1224,7 +1234,7 @@ class Experiment:
                 first_trial_in_block = True
 
             # resting period and feedback   
-            if N in self.settings.get_fb_block()[1:]:
+            if N in self.settings.get_session_starts() and N in self.settings.get_fb_block()[1:]:
                                                 
                 with self.shared_data_lock:
                     self.last_N = N - 1
@@ -1255,11 +1265,11 @@ class Experiment:
             # end of the sessions (one run of the experiment script stops at the end of the current session)
             if N == self.end_at[N - 1]:
             # if N == (len(self.stimlist) - 1):    
-                self.print_to_screen("Fin de la tâche. Merci d'avoir participé.")
-                core.wait(5)
+                self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
+                core.wait(20)
                 break
 
-    def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise', 
+    def run(self, full_screen=True, mouse_visible=False, window_gammaErrorPolicy='raise', 
             parallel_port=False,
             eyetrack=False):
         

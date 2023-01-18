@@ -1,0 +1,89 @@
+inst#
+
+Welcome!
+
+On the screen, you will see four images appear one at a time.
+
+Your task is to press the key corresponding to the image that has just appeared.
+
+Press a key to continue.
+
+***
+
+inst#
+
+You must use the following keys:
+
+H J K L
+
+Press the keys corresponding to the images
+as accurately and quickly as possible!
+
+The next picture will not appear until you give the correct answer.
+
+Use your right hand only.
+
+Press a key to continue.
+
+***
+
+inst#
+
+Stare at the fixation cross at the center of the screen.
+
+Regularly during the task, you can rest by closing your eyes.
+
+When you hear the sound signifying the end of the break, open your eyes and 
+resume the task without losing time.
+
+Press a key to continue.
+
+***
+
+inst#
+
+You will receive regular feedback on your performance 
+- use it to improve them !
+
+You will start with a training phase.
+
+When you are ready, press a button to start the task!
+
+***
+
+training end#
+
+End of training.
+
+Press a key to start the real task!
+
+***
+
+feedback#
+
+Your average reaction time : *MEANRT* seconds
+Your accuracy : *PERCACC* %
+
+COMMENT
+
+***
+
+resume#
+
+Press a key to start the task!
+
+***
+
+ending#
+
+The experiment is over!
+
+Thank you for participating.
+
+***
+
+unexpected quit#
+
+The task stopped unexpectedly.
+
+Press a key to resume!
