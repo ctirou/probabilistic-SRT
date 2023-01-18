@@ -208,7 +208,7 @@ class ExperimentSettings:
         if self.blockstarts == None:
             self.blockstarts = [1]
             for i in range(1, self.blocks_in_session + 2):
-                self.blockstarts.append(i * (self.trials_in_block) + 1)
+                self.blockstarts.append(i * self.trials_in_block + 1)
         
         return self.blockstarts
     
@@ -252,9 +252,9 @@ class ExperimentSettings:
         settings_dialog = gui.Dlg(title='Experiment design')
         settings_dialog.addText('No settings saved for this experiment yet...')
         settings_dialog.addField('Current session:', choices=['1st', '2nd'])
-        settings_dialog.addField('Blocks per session', 160)
-        settings_dialog.addField('Trials in training block', 40)
-        settings_dialog.addField('Trials per testing block', 20)
+        settings_dialog.addField('Blocks per session', 5)
+        settings_dialog.addField('Trials in training block', 5)
+        settings_dialog.addField('Trials per testing block', 5)
         returned_data = settings_dialog.show()
         if settings_dialog.OK:
             if returned_data[0] == '1st':
@@ -781,8 +781,8 @@ class Experiment:
         trials = np.arange(self.settings.maxtrial_traintest())
         half_test = (self.settings.maxtrial_test())/2
         data = pd.DataFrame({'trials': trials,
-                             'trial_keys': np.zeros(len(trials), dtype=int),
-                             'trial_type': ['to_define']*len(trials)})
+                                'trial_keys': np.zeros(len(trials), dtype=int),
+                                'trial_type': ['to_define']*len(trials)})
 
         np.random.shuffle(keys)
         
@@ -850,7 +850,7 @@ class Experiment:
                         else:
                             data.trial_keys.at[trial] = keys[0]
                             data.trial_type.at[trial] = 'low_prob'
- 
+
         data.to_csv(f'{self.settings.sequence_file_path}/{str(self.subject_number).zfill(2)}_seq_{self.settings.current_session}.csv')        
             
     def open_sequence(self):
@@ -891,8 +891,7 @@ class Experiment:
             block_num += 1
             current_trial_num = 0
     
-            # training
-            
+            # training        
             for train in range(1, self.settings.trials_in_tBlock + 1):
                 current_trial_num += 1
                 all_trial_Nr += 1      
@@ -900,8 +899,7 @@ class Experiment:
                 self.stimtrial[all_trial_Nr] = current_trial_num
                 self.stimblock[all_trial_Nr] = block_num
                                 
-            # testing
-            
+            # test
             for test in range(self.settings.trials_in_tBlock + 1, self.settings.maxtrial_traintest() + 1):
                 current_trial_num += 1
                 all_trial_Nr += 1
@@ -1234,7 +1232,7 @@ class Experiment:
                 first_trial_in_block = True
 
             # resting period and feedback   
-            if N in self.settings.get_session_starts() and N in self.settings.get_fb_block()[1:]:
+            if N in self.settings.get_block_starts() and N in self.settings.get_fb_block()[1:]:
                                                 
                 with self.shared_data_lock:
                     self.last_N = N - 1
@@ -1247,7 +1245,7 @@ class Experiment:
 
                 timer = core.CountdownTimer(self.settings.rest_time)
                 while timer.getTime() > 0:
-                    self.show_feedback(N, responses_in_block,accs_in_block, RT_all_list)
+                    self.show_feedback(N, responses_in_block, accs_in_block, RT_all_list)
                 
                 responses_in_block = 0
                 RT_all_list = []
@@ -1255,7 +1253,7 @@ class Experiment:
                 first_trial_in_block = True
             
             # end of training
-            if N == (self.settings.trials_in_tBlock):
+            if N == self.settings.trials_in_tBlock:
                 # self.instructions.show_training_end(self)
                 self.print_to_screen("Fin de l'entraînement. \n\n Appuyez sur une touche pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
@@ -1269,7 +1267,7 @@ class Experiment:
                 core.wait(20)
                 break
 
-    def run(self, full_screen=True, mouse_visible=False, window_gammaErrorPolicy='raise', 
+    def run(self, full_screen=True, mouse_visible=True, window_gammaErrorPolicy='raise', 
             parallel_port=False,
             eyetrack=False):
         
