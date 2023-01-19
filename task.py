@@ -208,7 +208,8 @@ class ExperimentSettings:
         if self.blockstarts == None:
             self.blockstarts = [1]
             for i in range(1, self.blocks_in_session + 2):
-                self.blockstarts.append(i * self.trials_in_block + 1)
+                # self.blockstarts.append(i * self.trials_in_block + 1)
+                self.blockstarts.append(i * self.trials_in_block)
         
         return self.blockstarts
     
@@ -778,25 +779,25 @@ class Experiment:
         """Generates csv file with list of stimuli for current session."""
         
         keys = [1, 2, 3, 4]
-        trials = np.arange(self.settings.maxtrial_traintest())
-        half_test = (self.settings.maxtrial_test())/2
+        trials = np.arange(1, self.settings.maxtrial_traintest() + 2)
+        half = self.settings.maxtrial_test()/2
         data = pd.DataFrame({'trials': trials,
-                                'trial_keys': np.zeros(len(trials), dtype=int),
-                                'trial_type': ['to_define']*len(trials)})
+                             'trial_keys': np.zeros(len(trials), dtype=int),
+                             'trial_type': ['to_define']*len(trials)})
 
         np.random.shuffle(keys)
-        
+
         if self.settings.current_session == 1:
             for trial in trials:
-                if trial in np.arange((self.settings.trials_in_tBlock), (len(trials) + 1), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock + half + 1), (len(trials) + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
-                elif trial in np.arange(0, (self.settings.trials_in_tBlock)):
+                elif trial in np.arange(1, (self.settings.trials_in_tBlock + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + half_test)):
+                elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + half + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
-                    data.trial_type.at[trial] = 'random'                
+                    data.trial_type.at[trial] = 'random'
                 else:
                     if data.trial_keys[trial-1] == keys[0]:
                         data.trial_keys.at[trial] = keys[1]
@@ -820,13 +821,13 @@ class Experiment:
                             data.trial_type.at[trial] = 'low_prob'
         else:
             for trial in trials:
-                if trial in np.arange((self.settings.trials_in_tBlock), (len(trials) + 1), self.settings.trials_in_block):
+                if trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + half + 1), self.settings.trials_in_block):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
-                elif trial in np.arange(0, (self.settings.trials_in_tBlock)):
+                elif trial in np.arange(1, (self.settings.trials_in_tBlock + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
-                elif trial in np.arange((self.settings.trials_in_tBlock + half_test + 1), (len(trials))):
+                elif trial in np.arange((self.settings.trials_in_tBlock + half + 1), (len(trials) + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
                 else:
@@ -922,8 +923,7 @@ class Experiment:
                                           str(self.subject_number) + '_seq' + str(self.settings.current_session) + '.csv')
         subject_list_file_path = os.path.join(self.workdir_path, "settings",
                                             "participants_in_experiment.txt")
-        # output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.txt')
-        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log_' + str(self.settings.current_session)+ '.txt')
+        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.txt')
         self.person_data = PersonDataHandler(subject_id, all_settings_file_path,
                                             all_IDs_file_path, sequence_file_path, subject_list_file_path,
                                             output_file_path)
@@ -1032,17 +1032,15 @@ class Experiment:
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
         
+        stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[0]], 
+                                pos=(0,0), units='pix', size=(128, 128), opacity=1)
+
+        
         # fixation cross
         fixation_cross = visual.TextStim(win=self.mywindow, text="+", 
                                               units="cm", height=1,
                                               color='black', opacity=.7,
-                                              pos=(0,0))
-        
-        # fixation_cross = visual.ShapeStim(win=self.mywindow, name='polygon', vertices='cross',
-        #                                   size=(1, 1), pos=(0, 0), anchor='center',
-        #                                   lineWidth=1.0, colorSpace='rgb',  lineColor='black', fillColor='black',
-        #                                   opacity=1, depth=0.0, interpolate=True)
-    
+                                              pos=(0,0))    
                 
         # Photodiode configuration
         screen = pyglet.canvas.get_display().get_default_screen()
@@ -1093,23 +1091,24 @@ class Experiment:
         
         # show instructions or continuation message
         if N in self.settings.get_session_starts():
+        # if N == 0:
             self.instructions.show_instructions(self)
         else:
             self.instructions.show_unexp_quit(self)
         
         RSI.start(self.settings.RSI_time)
+        
         while True:
             
+            stim.draw()
             fixation_cross.draw()
-            stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[0]], 
-                                    pos=(0,0), units='pix', size=(128, 128), opacity=1)
             self.mywindow.flip()
 
             with self.shared_data_lock:
                 self.last_N = N - 1
                 self.trial_phase = "before stimulus"
                 self.last_RSI = -1
-            
+                        
             # wait before the next stimulus to have the set RSI
             RSI.complete()
             
@@ -1232,7 +1231,7 @@ class Experiment:
                 first_trial_in_block = True
 
             # resting period and feedback   
-            if N in self.settings.get_block_starts() and N in self.settings.get_fb_block()[1:]:
+            if N in self.settings.get_fb_block()[1:]:
                                                 
                 with self.shared_data_lock:
                     self.last_N = N - 1
@@ -1255,7 +1254,7 @@ class Experiment:
             # end of training
             if N == self.settings.trials_in_tBlock:
                 # self.instructions.show_training_end(self)
-                self.print_to_screen("Fin de l'entraînement. \n\n Appuyez sur une touche pour lancer la vraie tache !")
+                self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur une touche pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
                 if self.settings.key_quit in press:
                     core.quit()
@@ -1264,7 +1263,7 @@ class Experiment:
             if N == self.end_at[N - 1]:
             # if N == (len(self.stimlist) - 1):    
                 self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
-                core.wait(20)
+                core.wait(10)
                 break
 
     def run(self, full_screen=True, mouse_visible=True, window_gammaErrorPolicy='raise', 
