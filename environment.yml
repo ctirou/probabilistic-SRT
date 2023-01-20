@@ -257,4 +257,3 @@ dependencies:
     - pytest-cov==4.0.0
     - tobii-research==1.10.1
     - tomli==2.0.1
-prefix: /Users/coum/opt/anaconda3/envs/psychopy
