@@ -208,8 +208,8 @@ class ExperimentSettings:
         if self.blockstarts == None:
             self.blockstarts = [1]
             for i in range(1, self.blocks_in_session + 2):
-                # self.blockstarts.append(i * self.trials_in_block + 1)
-                self.blockstarts.append(i * self.trials_in_block)
+                self.blockstarts.append(i * self.trials_in_block + 1)
+                # self.blockstarts.append(i * self.trials_in_block)
         
         return self.blockstarts
     
@@ -229,18 +229,15 @@ class ExperimentSettings:
         if self.sessionstarts == None:
             self.sessionstarts = [1]
             epochs_cumulative = []
-            session_no = 0
             e_temp = 0
             
-            for e in range(self.blocks_in_session):
+            for e in range(self.numsessions):
                 e_temp += e
-                session_no += 1
                 epochs_cumulative.append(e_temp)
 
             for e in epochs_cumulative:
-                self.sessionstarts.append(e * self.blocks_in_session * self.trials_in_block + 1)
-
-            del self.sessionstarts[0]
+                if e != 0:
+                    self.sessionstarts.append(e * self.blocks_in_session * self.trials_in_block + self.trials_in_tBlock + 1)
             
         return self.sessionstarts
 
@@ -253,16 +250,16 @@ class ExperimentSettings:
         settings_dialog = gui.Dlg(title='Experiment design')
         settings_dialog.addText('No settings saved for this experiment yet...')
         settings_dialog.addField('Current session:', choices=['1st', '2nd'])
-        settings_dialog.addField('Blocks per session', 5)
-        settings_dialog.addField('Trials in training block', 5)
-        settings_dialog.addField('Trials per testing block', 5)
+        settings_dialog.addField('Blocks per session', 160)
+        settings_dialog.addField('Trials in training block', 40)
+        settings_dialog.addField('Trials per testing block', 20)
         returned_data = settings_dialog.show()
         if settings_dialog.OK:
             if returned_data[0] == '1st':
                 self.current_session = 1
             else:
                 self.current_session = 2
-            self.blocks_in_session = returned_data[1] + 1 # test blocks + training block
+            self.blocks_in_session = returned_data[1]
             self.trials_in_tBlock = returned_data[2]
             self.trials_in_block = returned_data[3]
         else:
@@ -878,8 +875,8 @@ class Experiment:
 
         all_trial_Nr = 0
         block_num = 0
-        sessionsstarts = self.settings.get_session_starts()
         
+        sessionsstarts = self.settings.get_session_starts()
         for trial_num in range(1, self.settings.maxtrial_traintest() + 1):
             for session_num in range(1, len(sessionsstarts)):
                 if trial_num >= sessionsstarts[session_num - 1] and trial_num < sessionsstarts[session_num]:
@@ -891,21 +888,20 @@ class Experiment:
 
             block_num += 1
             current_trial_num = 0
-    
+
             # training        
             for train in range(1, self.settings.trials_in_tBlock + 1):
                 current_trial_num += 1
                 all_trial_Nr += 1      
-
+                
                 self.stimtrial[all_trial_Nr] = current_trial_num
-                self.stimblock[all_trial_Nr] = block_num
+                self.stimblock[all_trial_Nr] = 0
                                 
             # test
             for test in range(self.settings.trials_in_tBlock + 1, self.settings.maxtrial_traintest() + 1):
                 current_trial_num += 1
-                all_trial_Nr += 1
-                                    
-                self.stimtrial[all_trial_Nr] = current_trial_num
+                all_trial_Nr += 1 
+                self.stimtrial[all_trial_Nr] = current_trial_num          
                 self.stimblock[all_trial_Nr] = block_num
                 
     def participant_id(self):
@@ -973,7 +969,7 @@ class Experiment:
         """Measure the frame rate, using different measurements."""
 
         self.print_to_screen(
-            "Preparation...")
+            "Chargement...")
         core.wait(2)
 
         ms_per_frame = self.mywindow.getMsPerFrame(nFrames=120)
@@ -1032,7 +1028,8 @@ class Experiment:
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
         
-        stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[0]], 
+        # stimulus init
+        stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[1]], 
                                 pos=(0,0), units='pix', size=(128, 128), opacity=1)
 
         
@@ -1252,21 +1249,21 @@ class Experiment:
                 first_trial_in_block = True
             
             # end of training
-            if N == self.settings.trials_in_tBlock:
+            if N == self.settings.trials_in_tBlock + 1:
                 # self.instructions.show_training_end(self)
-                self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur une touche pour lancer la vraie tache !")
+                self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur H pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
                 if self.settings.key_quit in press:
                     core.quit()
             
-            # end of the sessions (one run of the experiment script stops at the end of the current session)
+            # end of session
             if N == self.end_at[N - 1]:
             # if N == (len(self.stimlist) - 1):    
-                self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
+                self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé(e) !")
                 core.wait(10)
                 break
 
-    def run(self, full_screen=True, mouse_visible=True, window_gammaErrorPolicy='raise', 
+    def run(self, full_screen=True, mouse_visible=False, window_gammaErrorPolicy='raise', 
             parallel_port=False,
             eyetrack=False):
         
@@ -1323,7 +1320,7 @@ class Experiment:
 
         # init window
         self.monitor_settings()
-        with visual.Window(size=self.mymonitor.getSizePix(), color='Ivory', fullscr=False, 
+        with visual.Window(size=self.mymonitor.getSizePix(), color='Ivory', fullscr=True, 
                            monitor=self.mymonitor, units="pix", gammaErrorPolicy=window_gammaErrorPolicy) as self.mywindow:
             
             self.mywindow.mouseVisible = mouse_visible

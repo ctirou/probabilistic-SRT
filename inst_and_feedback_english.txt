@@ -6,7 +6,7 @@ On the screen, you will see four images appear one at a time.
 
 Your task is to press the key corresponding to the image that has just appeared.
 
-Press a key to continue.
+Press H to continue.
 
 ***
 
@@ -23,7 +23,7 @@ The next picture will not appear until you give the correct answer.
 
 Use your right hand only.
 
-Press a key to continue.
+Press H to continue.
 
 ***
 
@@ -36,7 +36,7 @@ Regularly during the task, you can rest by closing your eyes.
 When you hear the sound signifying the end of the break, open your eyes and 
 resume the task without losing time.
 
-Press a key to continue.
+Press H to continue.
 
 ***
 
@@ -47,7 +47,7 @@ You will receive regular feedback on your performance
 
 You will start with a training phase.
 
-When you are ready, press a button to start the task!
+When you are ready, press H to start the task!
 
 ***
 
@@ -55,7 +55,7 @@ training end#
 
 End of training.
 
-Press a key to start the real task!
+Press H to start the real task!
 
 ***
 
@@ -70,7 +70,7 @@ COMMENT
 
 resume#
 
-Press a key to start the task!
+Press H to start the task!
 
 ***
 
@@ -86,4 +86,4 @@ unexpected quit#
 
 The task stopped unexpectedly.
 
-Press a key to resume!
+Press H to resume!
