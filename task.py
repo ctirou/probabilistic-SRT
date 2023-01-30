@@ -15,6 +15,7 @@ import threading
 import os.path as op
 import pandas as pd
 import numpy as np
+from math import atan2, degrees
 
 meg_record = False
 
@@ -61,7 +62,20 @@ def normalize_string(string, blank_char):
     string = string.replace(' ', blank_char)
     return string
 
-
+def pixel_to_degrees(h, d, r, size_px):
+    """
+        h: height of the monitor in cm
+        d: distance from the participant to the monitor in cm
+        r: vertical resolution of the monitor in pixels
+        size_px: stimulus size in pixels
+    """
+    # calculate the number of degrees that correspond to a single pixel
+    deg_per_px = degrees(atan2(.5 * h, d)) / (.5 * r)
+    
+    size_in_deg = size_px * deg_per_px
+    
+    return size_in_deg
+    
 class ExperimentSettings:
     """
         This class handles all operation related to experiment settings.
@@ -77,9 +91,11 @@ class ExperimentSettings:
         self.trials_in_pretrain = None
         self.trials_in_tBlock = None
         self.trials_in_block = None
-
-        self.monitor_width = None
+        
         self.computer_name = None
+        self.monitor_width = None
+        self.monitor_height = None
+        self.monitor_distance = None
 
         self.RSI_time = None # response-to-next-stimulus in milliseconds
         self.rest_time = None # resting period duration in seconds
@@ -88,6 +104,7 @@ class ExperimentSettings:
         self.key2 = None
         self.key3 = None
         self.key4 = None
+        self.key5 = None
         self.key_quit = None
 
         self.whether_warning = None
@@ -119,9 +136,11 @@ class ExperimentSettings:
                 self.trials_in_pretrain = settings_file['trials_in_pretrain']
                 self.trials_in_tBlock = settings_file['trials_in_tBlock']
                 self.trials_in_block = settings_file['trials_in_block']
-
-                self.monitor_width = settings_file['monitor_width']
+                
                 self.computer_name = settings_file['computer_name']
+                self.monitor_width = settings_file['monitor_width']
+                self.monitor_height = settings_file['monitor_height']
+                self.monitor_distance = settings_file['monitor_distance']
 
                 self.RSI_time = settings_file['RSI_time']
                 self.rest_time = settings_file['rest_time']
@@ -130,6 +149,7 @@ class ExperimentSettings:
                 self.key2 = settings_file['key2']
                 self.key3 = settings_file['key3']
                 self.key4 = settings_file['key4']
+                self.key5 = settings_file['key5']
                 self.key_quit = settings_file['key_quit']
 
                 self.whether_warning = settings_file['whether_warning']
@@ -150,9 +170,11 @@ class ExperimentSettings:
             settings_file['trials_in_pretrain'] = self.trials_in_pretrain
             settings_file['trials_in_tBlock'] = self.trials_in_tBlock
             settings_file['trial_in_block'] = self.trials_in_block
-
-            settings_file['monitor_width'] = self.monitor_width
+            
             settings_file['computer_name'] = self.computer_name
+            settings_file['monitor_width'] = self.monitor_width
+            settings_file['monitor_height'] = self.monitor_height
+            settings_file['monitor_distance'] = self.monitor_distance
 
             settings_file['RSI_time'] = self.RSI_time
             settings_file['rest_time'] = self.rest_time
@@ -161,6 +183,7 @@ class ExperimentSettings:
             settings_file['key2'] = self.key2
             settings_file['key3'] = self.key3
             settings_file['key4'] = self.key4
+            settings_file['key5'] = self.key5
             settings_file['key_quit'] = self.key_quit
 
             settings_file['whether_warning'] = self.whether_warning
@@ -172,11 +195,13 @@ class ExperimentSettings:
 
         with codecs.open(self.reminder_file_path, 'w', encoding='utf-8') as reminder_file:
             reminder = str('Settings\n' +
-                           '/n' +
+                           '\n' +
+                           'Computer Name: ' + '\t' + self.computer_name + '\n' +
                            'Monitor Width: ' + '\t' + str(self.monitor_width).replace('.', ',') + '\n' +
-                           'Computer Name: ' + '\t' + self.computer_name + '\n')
+                           'Monitor Height: ' + '\t' + str(self.monitor_height).replace('.', ',') + '\n' +
+                           'Distance to monitor: ' + '\t' + str(self.monitor_distance).replace('.', ',') + '\n')
 
-            reminder += str('Response keys: ' + '\t' + self.key1 + ', ' + self.key2 + ', ' + self.key3 + ', ' + self.key4 + '.' + '\n' +
+            reminder += str('Response keys: ' + '\t' + self.key1 + ', ' + self.key2 + ', ' + self.key3 + ', ' + self.key4 + ',' + self.key5 + '.' + '\n' +
                             'Quit key: ' + '\t' + self.key_quit + '\n' +
                             'Warning (speed, accuracy): ' + '\t' + str(self.whether_warning) + '\n' +
                             'Speed warning at:' + '\t' + str(self.speed_warning) + '\n' +
@@ -256,7 +281,7 @@ class ExperimentSettings:
         return self.sessionstarts
 
     def get_key_list(self):
-        return (self.key1, self.key2, self.key3, self.key4, self.key_quit)
+        return (self.key1, self.key2, self.key3, self.key4, self.key5, self.key_quit)
 
     def show_basic_settings_dialog(self):
         """ Ask the user to specify the number of groups and the number of sessions."""
@@ -265,7 +290,7 @@ class ExperimentSettings:
         settings_dialog.addText('No settings saved for this experiment yet...')
         settings_dialog.addField('Current session:', choices=['1st', '2nd'])
         settings_dialog.addField('Blocks per session', 140)
-        settings_dialog.addField('Trials in pre-training', 10)
+        settings_dialog.addField('Trials in pre-training', 5)
         settings_dialog.addField('Trials in training block', 40)
         settings_dialog.addField('Trials per testing block', 20)
         returned_data = settings_dialog.show()
@@ -285,19 +310,24 @@ class ExperimentSettings:
         """Ask the user specific information about the computer and also change display settings."""
 
         settings_dialog = gui.Dlg(title='Settings')
+        settings_dialog.addText('On the monitor...')
+        settings_dialog.addField('Computer name', 'CERMEP_bat_452')
         settings_dialog.addField('Monitor Width (cm)', 34.2)
-        settings_dialog.addField('Computer name', 'local_cermep')
+        settings_dialog.addField('Monitor Height (cm)', 28.62)
+        settings_dialog.addField('Distance to monitor (cm)', 80)
+        settings_dialog.addText('On timings...')
         settings_dialog.addField('RSI (ms)', 120)
         settings_dialog.addField('Resting time (s)', 5)
 
         returned_data = settings_dialog.show()
 
         if settings_dialog.OK:
-            self.monitor_width = returned_data[0]
-            self.computer_name = returned_data[1]
-            self.RSI_time = float(returned_data[2]) / 1000
-            self.rest_time = float(returned_data[3])
-
+            self.computer_name = returned_data[0]
+            self.monitor_width = returned_data[1]
+            self.monitor_height = returned_data[2]
+            self.monitor_distance = returned_data[3]
+            self.RSI_time = float(returned_data[4]) / 1000
+            self.rest_time = float(returned_data[5])
         else:
             core.quit()
 
@@ -307,10 +337,11 @@ class ExperimentSettings:
 
         settings_dialog = gui.Dlg(title='Settings')
         settings_dialog.addText('Answer keys')
-        settings_dialog.addField('Up:', 'h')
-        settings_dialog.addField('Left', 'j')
-        settings_dialog.addField('Right', 'k')
-        settings_dialog.addField('Down', 'l')
+        settings_dialog.addField('1:', 'y')
+        settings_dialog.addField('2:', 'u')
+        settings_dialog.addField('3:', 'i')
+        settings_dialog.addField('4:', 'o')
+        settings_dialog.addField('5:', 'space')
         settings_dialog.addField('Quit', 'q')
         settings_dialog.addField('Warning for accuracy/speed:', True)
         settings_dialog.addField('Warning for speed above this threshold (%):', 93)
@@ -321,16 +352,16 @@ class ExperimentSettings:
             self.key2 = returned_data[1]
             self.key3 = returned_data[2]
             self.key4 = returned_data[3]
-            self.key_quit = returned_data[4]
-            self.whether_warning = returned_data[5]
-            self.speed_warning = returned_data[6]
-            self.acc_warning = returned_data[7]
+            self.key5 = returned_data[4]
+            self.key_quit = returned_data[5]
+            self.whether_warning = returned_data[6]
+            self.speed_warning = returned_data[7]
+            self.acc_warning = returned_data[8]
         else:
             core.quit()
 
     # def eyetrack_init(self, edfFileName):
-    #     screen = pyglet.canvas.get_display().get_default_screen()
-    #     selfEdf = EyeLink.tracker(screen.width, screen.height, edfFileName)
+    #     selfEdf = EyeLink.tracker(1920, 1080, edfFileName)
     #     EyeLink.tracker.sendMessage(selfEdf, 'H')
     #     EyeLink.tracker.close(selfEdf, edfFileName)
 
@@ -624,7 +655,7 @@ class PersonDataHandler:
                         'RT',
                         'error',
                         'stimulus',
-                        # 'response',
+                        'response',
                         'respKeys',
                         'respRT',
                         'tresptrig',
@@ -794,7 +825,7 @@ class Experiment:
     def create_sequence(self):
         """Generates csv file with list of stimuli for current session."""
 
-        keys = [1, 2, 3, 4]
+        keys = [1, 2, 3, 4, 5]
         trials = np.arange(1, self.settings.maxtrial_traintest() + 2)
         half = self.settings.maxtrial_test()/2
         data = pd.DataFrame({'trials': trials,
@@ -1032,6 +1063,8 @@ class Experiment:
     def wait_for_response1(self, expected_response, response_clock):
         press = event.waitKeys(keyList=self.settings.get_key_list(),
                                timeStamped=response_clock)
+        if press[0][0] == 'q':
+            return (-1, press[0][1])
         return (self.pressed_dict[press[0][0]], press[0][1])
 
     def wait_for_response2(self, tStart, k=0, r=0, t=0):
@@ -1049,39 +1082,129 @@ class Experiment:
 
     def send_trigger(self, N):
         
-        d = {
-            'training': [11, 12, 13, 14],
-            'no transition': [11, 12, 13, 14],
-            'random': [21, 22, 23, 24],
-            'deterministic': [31, 32, 33, 34],
-            'high_prob': [41, 42, 43, 44],
-            'medium_prob': [51, 52, 53, 54],
-            'low_prob': [61, 62, 63, 64],
-        }
+        # d = {'training': [1, 2, 3, 4, 5],
+        #      'no transition': [11, 12, 13, 14, 15],
+        #      'random': [21, 22, 23, 24, 25],
+        #      'deterministic': [31, 32, 33, 34, 35],
+        #      'high_prob': [41, 42, 43, 44, 45],
+        #      'medium_prob': [51, 52, 53, 54, 55],
+        #      'low_prob': [61, 62, 63, 64, 65]}
         
-        if self.stimlist[N] == 1 and self.stimpr[N] == 'training':
-            port.setData(11)
-            time.sleep(.5)
-            port.setData(0)
-        elif self.stimlist[N] == 2 and self.stimpr[N] == 'training':
-            port.setData(12)
-            time.sleep(.5)
-            port.setData(0)
-        elif self.stimlist[N] == 3 and self.stimpr[N] == 'training':
-            port.setData(13)
-            time.sleep(.5)
-            port.setData(0)
-        elif self.stimlist[N] == 4 and self.stimpr[N] == 'training':
-            port.setData(14)
-            time.sleep(.5)
-            port.setData(0)
-
+        if self.stimpr[N] == 'training':
+            if self.stimlist[N] == 1:
+                port.setData(1)
+                time.sleep(.5)
+            elif self.stimlist[N] == 2:
+                port.setData(2)
+                time.sleep(.5)
+            elif self.stimlist[N] == 3:
+                port.setData(3)
+                time.sleep(.5)
+            elif self.stimlist[N] == 4:
+                port.setData(4)
+                time.sleep(.5)
+        elif self.stimpr[N] == 'no transition':
+            if self.stimlist[N] == 1:
+                port.setData(11)
+                time.sleep(.5)
+            elif self.stimlist[N] == 2:
+                port.setData(12)
+                time.sleep(.5)
+            elif self.stimlist[N] == 3:
+                port.setData(13)
+                time.sleep(.5)
+            elif self.stimlist[N] == 4:
+                port.setData(14)
+                time.sleep(.5)
+        elif self.stimp[N] == 'random':
+            if self.stimlist[N] == 1:
+                port.setData(21)
+                time.sleep(.5)
+            elif self.stimlist[N] == 2:
+                port.setData(22)
+                time.sleep(.5)
+            elif self.stimlist[N] == 3:
+                port.setData(23)
+                time.sleep(.5)
+            elif self.stimlist[N] == 4:
+                port.setData(24)
+                time.sleep(.5)
+        elif self.stimpr[N] == 'deterministic':
+            if self.stimlist[N] == 1:
+                port.setData(31)
+                time.sleep(.5)
+            elif self.stimlist[N] == 2:
+                port.setData(32)
+                time.sleep(.5)
+            elif self.stimlist[N] == 3:
+                port.setData(33)
+                time.sleep(.5)
+            elif self.stimlist[N] == 4:
+                port.setData(34)
+                time.sleep(.5)
+        elif self.stimpr[N] == 'high_prob':
+            if self.stimlist[N] == 1:
+                port.setData(41)
+                time.sleep(.5)
+            elif self.stimlist[N] == 2:
+                port.setData(42)
+                time.sleep(.5)
+            elif self.stimlist[N] == 3:
+                port.setData(43)
+                time.sleep(.5)
+            elif self.stimlist[N] == 4:
+                port.setData(44)
+                time.sleep(.5)
+        elif self.stimpr[N] == 'medium_prob':
+            if self.stimlist[N] == 1:
+                port.setData(51)
+                time.sleep(.5)
+            elif self.stimlist[N] == 2:
+                port.setData(52)
+                time.sleep(.5)
+            elif self.stimlist[N] == 3:
+                port.setData(53)
+                time.sleep(.5)
+            elif self.stimlist[N] == 4:
+                port.setData(54)
+                time.sleep(.5)
+        elif self.stimpr[N] == 'low_prob':
+            if self.stimlist[N] == 1:
+                port.setData(61)
+                time.sleep(.5)
+            elif self.stimlist[N] == 2:
+                port.setData(62)
+                time.sleep(.5)
+            elif self.stimlist[N] == 3:
+                port.setData(63)
+                time.sleep(.5)
+            elif self.stimlist[N] == 4:
+                port.setData(64)
+                time.sleep(.5)
+                
     def quit_presentation(self):
         self.print_to_screen("Exiting...\nSaving data...")
         self.person_data.append_to_output_file('userquit')
         core.wait(3)
         core.quit()
-
+        
+    def fixation_cross(self):
+        
+        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, 1920, 128)
+        
+        outer = visual.Circle(win=self.mywindow, units='degrees', radius=size,
+                              fillcolor='black', opacity=1)
+        inner = visual.Circle(win=self.mywindow, units='degrees', radius=size/3,
+                              fillcolor='black', opacity=1)
+        cross = visual.ShapeStim(
+            win=self.mywindow, vertices='cross',
+            units='degrees', size=(size, size),
+            ori=0.0, pos=(0, 0), anchor='center',
+            lineWidth=1.0, colorSpace='rgb',  lineColor='white', fillColor='white',
+            opacity=None, depth=-8.0, interpolate=True)
+        
+        return outer, cross, inner
+    
     def resting_period(self, fixation_cross, experiment):
         """Resting time with eyes closed."""
 
@@ -1103,6 +1226,7 @@ class Experiment:
                 fixation_cross.draw()
                 self.mywindow.flip()
 
+
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
 
@@ -1112,21 +1236,23 @@ class Experiment:
 
 
         # fixation cross
-        fixation_cross = visual.TextStim(win=self.mywindow, text="+",
-                                              units="cm", height=1,
-                                              color='black', opacity=.7,
-                                              pos=(0,0))
+        # fixation_cross = visual.TextStim(win=self.mywindow, text="+",
+        #                                       units="cm", height=1,
+        #                                       color='black', opacity=1,
+        #                                       pos=(0,0))
+        (outer, cross, inner) = self.fixation_cross()
 
         # Photodiode configuration
-        screen = pyglet.canvas.get_display().get_default_screen()
         pixel = visual.Rect(win=self.mywindow, units='pix',
-                            pos=(-screen.height, screen.height/2),
+                            pos=(-1920/2, 1080/2),
                             size=(50, 50),
                             fillColor='black', lineColor='black')
-        pixel.setAutoDraw(False) # set to True/False to activate/deactivate the photodiode
-        del screen
+        pixel.setAutoDraw(True) # set to True/False to activate/deactivate the photodiode
 
-        # negative feedback during training block
+        # feedbacks during training block
+        green = visual.Circle(win=self.mywindow, units='pix', radius=65,
+                            lineColor='green', fillColor='green',
+                            opacity=.50)
         red = visual.Circle(win=self.mywindow, units='pix', radius=65,
                             lineColor='red', fillColor='red',
                             opacity=.50)
@@ -1176,7 +1302,10 @@ class Experiment:
         while True:
 
             stim.draw()
-            fixation_cross.draw()
+            # fixation_cross.draw()
+            outer.draw()
+            cross.draw()
+            inner.draw()
             self.mywindow.flip()
 
             with self.shared_data_lock:
@@ -1198,9 +1327,12 @@ class Experiment:
                 respKeys = None
 
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]],
-                                        pos=(0,0), units='pix', size=(128, 128), opacity=1)
+                                        pos=(0,0), units='pix', size=(128, 128), opacity=1) # try setting the opacity to 0 if any issue in continuation
                 stim.draw()
-                fixation_cross.draw()
+                # fixation_cross.draw()
+                outer.draw()
+                cross.draw()
+                inner.draw()
                 self.mywindow.flip()
 
                 if cycle == 1:
@@ -1216,7 +1348,8 @@ class Experiment:
                 if cycle == 1:
                     trial_clock.reset()
                 (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock)
-                (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
+                if meg_record is True:
+                    (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
                 with self.shared_data_lock:
                     self.trial_phase = "after_reaction"
                 if meg_record:
@@ -1237,7 +1370,8 @@ class Experiment:
                     self.quit_presentation()
 
                 # correct response
-                elif str(respKeys) == str(self.stimlist[N]):
+                elif response == self.stimlist[N]:
+                # elif str(respKeys) == str(self.stimlist[N]):
                     # start of the RSI timer and offset of the stimulus
                     stim.setOpacity(0)
                     stim.draw()
@@ -1246,7 +1380,16 @@ class Experiment:
                     RSI.start(self.settings.RSI_time)
                     stimACC = 0
                     accs_in_block.append(0)
-                    if self.stimpr[N] == 'random':
+                    if self.stimpr[N] == 'training':
+                        timer = core.CountdownTimer(.2)
+                        while timer.getTime() > 0:
+                            # fixation_cross.draw()
+                            outer.draw()
+                            cross.draw()
+                            inner.draw()
+                            green.draw()
+                            self.mywindow.flip()
+                    elif self.stimpr[N] == 'random':
                         num_of_random += 1
                         RT_random_list.append(stimRT)
                     elif self.stimpr[N] == 'deterministic':
@@ -1267,7 +1410,10 @@ class Experiment:
                     if self.stimpr[N] == 'training':
                         timer = core.CountdownTimer(.2)
                         while timer.getTime() > 0:
-                            fixation_cross.draw()
+                            # fixation_cross.draw()
+                            outer.draw()
+                            cross.draw()
+                            inner.draw()
                             red.draw()
                             self.mywindow.flip()
                     elif self.stimpr[N] == 'random':
@@ -1348,7 +1494,7 @@ class Experiment:
                 core.wait(10)
                 break
 
-    def run(self, full_screen=True, mouse_visible=False, window_gammaErrorPolicy='raise',
+    def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise',
             meg_record=meg_record,
             eyetrack=False):
 
@@ -1365,7 +1511,8 @@ class Experiment:
         self.all_settings_def()
 
         self.pressed_dict = {self.settings.key1: 1, self.settings.key2: 2,
-                             self.settings.key3: 3, self.settings.key4: 4}
+                             self.settings.key3: 3, self.settings.key4: 4,
+                             self.settings.key5: 5}
 
         # create sorted list of stimuli images
         images = []
@@ -1382,8 +1529,9 @@ class Experiment:
         self.image_dict = {1:op.join(self.workdir_path, 'stimuli', images[0]),
                            2:op.join(self.workdir_path, 'stimuli', images[1]),
                            3:op.join(self.workdir_path, 'stimuli', images[2]),
-                           4:op.join(self.workdir_path, 'stimuli', images[3])}
-    
+                           4:op.join(self.workdir_path, 'stimuli', images[3]),
+                           5:op.join(self.workdir_path, 'stimuli', images[4])}
+        
         # read instruction strings
         inst_feedback_path = os.path.join(self.workdir_path, "inst_and_feedback.txt")
         self.instructions = InstructionHelper(inst_feedback_path)
@@ -1395,7 +1543,7 @@ class Experiment:
 
         # init window
         self.monitor_settings()
-        with visual.Window(size=(1920, 1080), color='Ivory', fullscr=True,
+        with visual.Window(size=(1920, 1080), color='Ivory', fullscr=False,
                            monitor=self.mymonitor, units="pix", gammaErrorPolicy=window_gammaErrorPolicy) as self.mywindow:
 
             self.mywindow.mouseVisible = mouse_visible
