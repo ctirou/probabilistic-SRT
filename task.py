@@ -1,10 +1,12 @@
 import pylink
+from EyeLinkCoreGraphicsPsychoPy import EyeLinkCoreGraphicsPsychoPy
 from psychopy import visual, core, event, gui, monitors, sound, parallel
 import psychtoolbox as ptb
+import pygame
+import pygame_menu
 from serial import Serial
 import time
 import shelve
-import random
 import codecs
 import os
 import pyglet
@@ -17,7 +19,7 @@ import pandas as pd
 import numpy as np
 from math import atan2, degrees
 
-meg_record = False
+meg_session = False
 
 addressPortParallel = '0x3FF8'
 
@@ -37,7 +39,7 @@ def serial_port(port='COM1', baudrate=9600, timeout=0):
     open_port.flush()
     return open_port
 
-if meg_record:
+if meg_session:
     #receive responses
     port_s = serial_port()
     # send triggers
@@ -231,6 +233,11 @@ class ExperimentSettings:
 
             reminder_file.write(reminder)
 
+    def max_trial_all(self):
+        """Get total number of trials in all sessions, training included."""
+
+        return (self.trials_in_block * self.blocks_in_session + self.trials_in_pretrain + self.trials_in_tBlock) * self.numsessions
+    
     def maxtrial_traintest(self):
         """Get total number of trials per session, training included."""
 
@@ -317,7 +324,7 @@ class ExperimentSettings:
         settings_dialog.addField('Distance to monitor (cm)', 80)
         settings_dialog.addText('On timings...')
         settings_dialog.addField('RSI (ms)', 120)
-        settings_dialog.addField('Resting time (s)', 5)
+        settings_dialog.addField('Resting time (s)', 7)
 
         returned_data = settings_dialog.show()
 
@@ -778,7 +785,7 @@ class Experiment:
         """Dialog shown after restart of the experiment for a subject.
            Displays the state of the experiment for the given subject."""
 
-        if self.last_N + 1 <= self.settings.maxtrial_traintest():
+        if self.last_N + 1 <= self.settings.max_trial_all():
             expstart11 = gui.Dlg(title='Starting task...')
             expstart11.addText("Already have participant's data")
             expstart11.addText('Continue from here...')
@@ -1019,7 +1026,7 @@ class Experiment:
 
         # use default screen resolution
         screen = pyglet.canvas.get_display().get_default_screen()
-        self.mymonitor = monitors.Monitor('myMon')
+        self.mymonitor = monitors.Monitor('myMon', distance=80)
         self.mymonitor.setSizePix([screen.width, screen.height])
         # need to set monitor width in cm to be able to use cm unit for stimulus
         self.mymonitor.setWidth(self.settings.monitor_width)
@@ -1076,7 +1083,7 @@ class Experiment:
                 k = key_from_serial2 # just the last key pressed
                 r = ptb.GetSecs() - tStart
                 t = ptb.GetSecs()
-                port.setData(50) # reponse ppt
+                port.setData(50) # response ppt
                 print(k)
         return k, r, t
 
@@ -1192,68 +1199,85 @@ class Experiment:
         
         size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, 1920, 128)
         
-        outer = visual.Circle(win=self.mywindow, units='degrees', radius=size,
-                              fillcolor='black', opacity=1)
-        inner = visual.Circle(win=self.mywindow, units='degrees', radius=size/3,
-                              fillcolor='black', opacity=1)
+        outer = visual.Circle(win=self.mywindow, units='deg', radius=size,
+                              fillColor='black', opacity=1)
+        inner = visual.Circle(win=self.mywindow, units='deg', radius=size/3,
+                              fillColor='black', opacity=1)
         cross = visual.ShapeStim(
             win=self.mywindow, vertices='cross',
-            units='degrees', size=(size, size),
+            units='deg', size=(size, size),
             ori=0.0, pos=(0, 0), anchor='center',
             lineWidth=1.0, colorSpace='rgb',  lineColor='white', fillColor='white',
-            opacity=None, depth=-8.0, interpolate=True)
+            opacity=1, depth=-8.0, interpolate=True)
         
-        return outer, cross, inner
+        outer.draw()
+        cross.draw()
+        inner.draw()
     
     def resting_period(self, fixation_cross, experiment):
         """Resting time with eyes closed."""
 
-        self.print_to_screen("Fermez vos yeux puis appuyez sur un bouton.")
-        tempkey = event.waitKeys(keyList=experiment.get_key_list())
+        self.print_to_screen("Fermez vos yeux.")
+        # wait for closing of eyes with eye-tracker
+        # tempkey = event.waitKeys(keyList=experiment.get_key_list())
 
         s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
 
-        if experiment.key_quit in tempkey:
-            self.quit_presentation()
-        else:
+        # if experiment.key_quit in tempkey:
+        #     self.quit_presentation()
+        # else:
+            # self.mywindow.flip()
+        rest_time = core.CountdownTimer(self.settings.rest_time)
+        while rest_time.getTime() > 1:
+            fixation_cross.draw()
             self.mywindow.flip()
-            rest_time = core.CountdownTimer(self.settings.rest_time)
-            while rest_time.getTime() > 1:
-                fixation_cross.draw()
-                self.mywindow.flip()
-            s.play()
-            while rest_time.getTime() > 0:
-                fixation_cross.draw()
-                self.mywindow.flip()
+        s.play()
+        while rest_time.getTime() > 0:
+            fixation_cross.draw()
+            self.mywindow.flip()
 
 
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
 
+        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, 1920, 128)
+
         # stimulus init
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[1]],
-                                pos=(0,0), units='pix', size=(128, 128), opacity=1)
+                                pos=(0,0), units='deg', size=(size, size), opacity=1) # try setting the opacity to 0 if any issue in continuation
 
 
-        # fixation cross
-        # fixation_cross = visual.TextStim(win=self.mywindow, text="+",
-        #                                       units="cm", height=1,
-        #                                       color='black', opacity=1,
-        #                                       pos=(0,0))
-        (outer, cross, inner) = self.fixation_cross()
-
+        # fixation cross init
+        fixation_cross = visual.TextStim(win=self.mywindow, text="+",
+                                              units="cm", height=1,
+                                              color='black', opacity=1,
+                                              pos=(0,0))
+        # (outer, cross, inner) = self.fixation_cross()
+        
+        
+        outer = visual.Circle(win=self.mywindow, units='deg', radius=size/6,
+                              fillColor='black', opacity=.6)
+        inner = visual.Circle(win=self.mywindow, units='deg', radius=size/36,
+                              fillColor='black', opacity=.6)
+        cross = visual.ShapeStim(
+            win=self.mywindow, vertices='cross',
+            units='deg', size=(size/3, size/3),
+            ori=0.0, pos=(0, 0), anchor='center',
+            lineWidth=.5, colorSpace='rgb',  lineColor='white', fillColor='white',
+            opacity=.6, depth=-8.0, interpolate=True)
+        
         # Photodiode configuration
         pixel = visual.Rect(win=self.mywindow, units='pix',
                             pos=(-1920/2, 1080/2),
                             size=(50, 50),
                             fillColor='black', lineColor='black')
-        pixel.setAutoDraw(True) # set to True/False to activate/deactivate the photodiode
+        pixel.setAutoDraw(True) # set to True/False to activate/deactivate
 
         # feedbacks during training block
-        green = visual.Circle(win=self.mywindow, units='pix', radius=65,
+        green = visual.Circle(win=self.mywindow, units='deg', radius=size/2,
                             lineColor='green', fillColor='green',
                             opacity=.50)
-        red = visual.Circle(win=self.mywindow, units='pix', radius=65,
+        red = visual.Circle(win=self.mywindow, units='deg', radius=size/2,
                             lineColor='red', fillColor='red',
                             opacity=.50)
 
@@ -1327,7 +1351,7 @@ class Experiment:
                 respKeys = None
 
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]],
-                                        pos=(0,0), units='pix', size=(128, 128), opacity=1) # try setting the opacity to 0 if any issue in continuation
+                                        pos=(0,0), units='deg', size=(size, size), opacity=1)
                 stim.draw()
                 # fixation_cross.draw()
                 outer.draw()
@@ -1348,11 +1372,12 @@ class Experiment:
                 if cycle == 1:
                     trial_clock.reset()
                 (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock)
-                if meg_record is True:
+                if meg_session:
                     (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
+                    self.send_trigger(N)
                 with self.shared_data_lock:
                     self.trial_phase = "after_reaction"
-                if meg_record:
+                if meg_session:
                     port.setData(0)
 
                 now = datetime.now()
@@ -1470,7 +1495,7 @@ class Experiment:
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
-                timer = core.CountdownTimer(self.settings.rest_time)
+                timer = core.CountdownTimer(self.settings.rest_time+3)
                 while timer.getTime() > 0:
                     self.show_feedback(N, responses_in_block, accs_in_block, RT_all_list)
 
@@ -1482,7 +1507,7 @@ class Experiment:
             # end of training
             if N == self.settings.trials_in_tBlock + 1:
                 # self.instructions.show_training_end(self)
-                self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur H pour lancer la vraie tache !")
+                self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur Y pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
                 if self.settings.key_quit in press:
                     core.quit()
@@ -1495,7 +1520,7 @@ class Experiment:
                 break
 
     def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise',
-            meg_record=meg_record,
+            meg_session=meg_session,
             eyetrack=False):
 
         # ensure all required folders are created, if not creates them
@@ -1561,7 +1586,7 @@ class Experiment:
             # show ending screen
             self.instructions.show_ending(self)
 
-            if meg_record is True:
+            if meg_session:
                 # Stop MEG recordings
                 time.sleep(1)
                 port.setData(253)
