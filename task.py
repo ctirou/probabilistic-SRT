@@ -1,9 +1,7 @@
-import pylink
-from EyeLinkCoreGraphicsPsychoPy import EyeLinkCoreGraphicsPsychoPy
 from psychopy import visual, core, event, gui, monitors, sound, parallel
 import psychtoolbox as ptb
-import pygame
-import pygame_menu
+# import pygame
+# import pygame_menu
 from serial import Serial
 import time
 import shelve
@@ -19,9 +17,28 @@ import pandas as pd
 import numpy as np
 from math import atan2, degrees
 
+debug_mode = True
 meg_session = False
+eyetracking = False
 
-addressPortParallel = '0x3FF8'
+
+if debug_mode:
+    mouse_visible = True
+    full_screen = False
+    screen_width = 600
+    screen_height = 500
+    dummy_mode = True
+else:
+    mouse_visible = True
+    full_screen = True
+    screen_width = 1920
+    screen_height = 1080
+    dummy_mode = False
+
+
+if eyetracking:
+    import pylink
+    from EyeLinkCoreGraphicsPsychoPy import EyeLinkCoreGraphicsPsychoPy
 
 def serial_port(port='COM1', baudrate=9600, timeout=0):
     """
@@ -40,14 +57,13 @@ def serial_port(port='COM1', baudrate=9600, timeout=0):
     return open_port
 
 if meg_session:
+    addressPortParallel = '0x3FE8'
+    # addressPortParallel = '0x3FF8'
+
     #receive responses
     port_s = serial_port()
     # send triggers
     port = parallel.ParallelPort(address=addressPortParallel)
-    # Start the MEG recordings
-    port.setData(0)
-    time.sleep(.05)
-    port.setData(252) # why ??
 
 try:
     root = op.dirname(op.abspath(__file__))
@@ -233,20 +249,25 @@ class ExperimentSettings:
 
             reminder_file.write(reminder)
 
-    def max_trial_all(self):
-        """Get total number of trials in all sessions, training included."""
-
-        return (self.trials_in_block * self.blocks_in_session + self.trials_in_pretrain + self.trials_in_tBlock) * self.numsessions
-    
-    def maxtrial_traintest(self):
-        """Get total number of trials per session, training included."""
-
-        return self.trials_in_block * self.blocks_in_session + self.trials_in_pretrain + self.trials_in_tBlock
-
-    def maxtrial_test(self):
-        """Get total number of trials per session, training excluded."""
-
-        return self.trials_in_block * self.blocks_in_session
+    def get_maxtrial(self, what):
+        
+        """Get total number of trials:
+                'all' : in all sessions, tutorial and training included
+                'preTrainTest': per session, tutorial and training included
+                'trainTest': per session, training included, tutorial excluded
+                'test': per session, tutorial and training exluded
+        """
+        
+        if what == 'all+tuto':
+            return (self.trials_in_block * self.blocks_in_session + self.trials_in_pretrain + self.trials_in_tBlock) * self.numsessions
+        elif what == 'all':
+            return (self.trials_in_block * self.blocks_in_session + self.trials_in_tBlock) * self.numsessions
+        elif what == 'preTrainTest':
+            return (self.trials_in_block * self.blocks_in_session + self.trials_in_pretrain + self.trials_in_tBlock)
+        elif what == 'trainTest':
+            return (self.trials_in_block * self.blocks_in_session + self.trials_in_tBlock)
+        elif what == 'test':
+            return (self.trials_in_block * self.blocks_in_session)
 
     def get_block_starts(self):
         """Return with a list of numbers indicating the first trials of the different blocks."""
@@ -264,7 +285,7 @@ class ExperimentSettings:
 
         if self.fb_block == None:
             self.fb_block = []
-            for i in range(self.trials_in_tBlock, (self.maxtrial_traintest() + 1), (self.trials_in_block * 4)):
+            for i in range(self.trials_in_tBlock, (self.get_maxtrial('trainTest') + 1), (self.trials_in_block * 4)):
                 self.fb_block.append(i + 1)
 
         return self.fb_block
@@ -306,10 +327,16 @@ class ExperimentSettings:
                 self.current_session = 1
             else:
                 self.current_session = 2
-            self.blocks_in_session = returned_data[1]
-            self.trials_in_pretrain = returned_data[2]
-            self.trials_in_tBlock = returned_data[3]
-            self.trials_in_block = returned_data[4]
+            if debug_mode:
+                self.blocks_in_session = 6
+                self.trials_in_pretrain = 5
+                self.trials_in_tBlock = 5
+                self.trials_in_block = 5
+            else:
+                self.blocks_in_session = returned_data[1]
+                self.trials_in_pretrain = returned_data[2]
+                self.trials_in_tBlock = returned_data[3]
+                self.trials_in_block = returned_data[4]
         else:
             core.quit()
 
@@ -604,6 +631,7 @@ class PersonDataHandler:
         output_buffer = StringIO()
         for data in self.output_data_buffer:
             N = data[0]
+            session = experiment.stim_sessionN[N]
 
             output_data = [experiment.subject_name,
                            str(experiment.subject_number).zfill(2),
@@ -785,7 +813,7 @@ class Experiment:
         """Dialog shown after restart of the experiment for a subject.
            Displays the state of the experiment for the given subject."""
 
-        if self.last_N + 1 <= self.settings.max_trial_all():
+        if self.last_N + 1 <= self.settings.get_maxtrial('all'):
             expstart11 = gui.Dlg(title='Starting task...')
             expstart11.addText("Already have participant's data")
             expstart11.addText('Continue from here...')
@@ -833,8 +861,8 @@ class Experiment:
         """Generates csv file with list of stimuli for current session."""
 
         keys = [1, 2, 3, 4, 5]
-        trials = np.arange(1, self.settings.maxtrial_traintest() + 2)
-        half = self.settings.maxtrial_test()/2
+        trials = np.arange(1, self.settings.get_maxtrial('trainTest') + 2)
+        half = self.settings.get_maxtrial('test')/2
         data = pd.DataFrame({'trials': trials,
                              'trial_keys': np.zeros(len(trials), dtype=int),
                              'trial_type': ['to_define']*len(trials)})
@@ -954,32 +982,33 @@ class Experiment:
         block_num = 0
 
         sessionsstarts = self.settings.get_session_starts()
-        for trial_num in range(1, self.settings.maxtrial_traintest() + 1):
+        for trial_num in range(1, self.settings.get_maxtrial('trainTest') + 1):
             for session_num in range(1, len(sessionsstarts)):
                 if trial_num >= sessionsstarts[session_num - 1] and trial_num < sessionsstarts[session_num]:
                     self.stim_sessionN[trial_num] = session_num
                     self.end_at[trial_num] = sessionsstarts[session_num]
+        
+        current_trial_num = 0
+        
+        # training
+        for train in range(1, self.settings.trials_in_tBlock + 1):
+            current_trial_num += 1
+            all_trial_Nr += 1
+
+            self.stimtrial[all_trial_Nr] = current_trial_num
+            self.stimblock[all_trial_Nr] = 0
 
 
         for block in range(1, self.settings.blocks_in_session + 1):
-
             block_num += 1
-            current_trial_num = 0
-
-            # training
-            for train in range(1, self.settings.trials_in_tBlock + 1):
-                current_trial_num += 1
-                all_trial_Nr += 1
-
-                self.stimtrial[all_trial_Nr] = current_trial_num
-                self.stimblock[all_trial_Nr] = 0
 
             # test
-            for test in range(self.settings.trials_in_tBlock + 1, self.settings.maxtrial_traintest() + 1):
+            for test in range(1, self.settings.trials_in_block + 1):
                 current_trial_num += 1
                 all_trial_Nr += 1
                 self.stimtrial[all_trial_Nr] = current_trial_num
                 self.stimblock[all_trial_Nr] = block_num
+
 
     def participant_id(self):
         """Find out the current subject and read subject settings / progress if he/she already has any data."""
@@ -996,7 +1025,7 @@ class Experiment:
                                           str(self.subject_number) + '_seq' + str(self.settings.current_session) + '.csv')
         subject_list_file_path = os.path.join(self.workdir_path, "settings",
                                             "participants_in_experiment.txt")
-        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.txt')
+        output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.csv')
         self.person_data = PersonDataHandler(subject_id, all_settings_file_path,
                                             all_IDs_file_path, sequence_file_path, subject_list_file_path,
                                             output_file_path)
@@ -1074,7 +1103,7 @@ class Experiment:
             return (-1, press[0][1])
         return (self.pressed_dict[press[0][0]], press[0][1])
 
-    def wait_for_response2(self, tStart, k=0, r=0, t=0):
+    def wait_for_response2(self, tStart, k=0, r=0, t=0): # create a while loop and insert eyetracking function
         key_from_serial2 = str(port_s.readline())[2:-1]
         # print(key_from_serial2)
         if len(key_from_serial2) > 0:
@@ -1096,98 +1125,74 @@ class Experiment:
         #      'high_prob': [41, 42, 43, 44, 45],
         #      'medium_prob': [51, 52, 53, 54, 55],
         #      'low_prob': [61, 62, 63, 64, 65]}
-        
+    
+
         if self.stimpr[N] == 'training':
             if self.stimlist[N] == 1:
-                port.setData(1)
-                time.sleep(.5)
+                trigg_value = 1
             elif self.stimlist[N] == 2:
-                port.setData(2)
-                time.sleep(.5)
+                trigg_value = 2
             elif self.stimlist[N] == 3:
-                port.setData(3)
-                time.sleep(.5)
+                trigg_value = 3
             elif self.stimlist[N] == 4:
-                port.setData(4)
-                time.sleep(.5)
+                trigg_value = 4
         elif self.stimpr[N] == 'no transition':
             if self.stimlist[N] == 1:
-                port.setData(11)
-                time.sleep(.5)
+                trigg_value = 11
             elif self.stimlist[N] == 2:
-                port.setData(12)
-                time.sleep(.5)
+                trigg_value = 12
             elif self.stimlist[N] == 3:
-                port.setData(13)
-                time.sleep(.5)
+                trigg_value = 13
             elif self.stimlist[N] == 4:
-                port.setData(14)
-                time.sleep(.5)
-        elif self.stimp[N] == 'random':
+                trigg_value = 14
+        elif self.stimpr[N] == 'random':
             if self.stimlist[N] == 1:
-                port.setData(21)
-                time.sleep(.5)
+                trigg_value = 21
             elif self.stimlist[N] == 2:
-                port.setData(22)
-                time.sleep(.5)
+                trigg_value = 22
             elif self.stimlist[N] == 3:
-                port.setData(23)
-                time.sleep(.5)
+                trigg_value = 23
             elif self.stimlist[N] == 4:
-                port.setData(24)
-                time.sleep(.5)
+                trigg_value = 24
         elif self.stimpr[N] == 'deterministic':
             if self.stimlist[N] == 1:
-                port.setData(31)
-                time.sleep(.5)
+                trigg_value = 31
             elif self.stimlist[N] == 2:
-                port.setData(32)
-                time.sleep(.5)
+                trigg_value = 32
             elif self.stimlist[N] == 3:
-                port.setData(33)
-                time.sleep(.5)
+                trigg_value = 33
             elif self.stimlist[N] == 4:
-                port.setData(34)
-                time.sleep(.5)
+                trigg_value = 34
         elif self.stimpr[N] == 'high_prob':
             if self.stimlist[N] == 1:
-                port.setData(41)
-                time.sleep(.5)
+                trigg_value = 41
             elif self.stimlist[N] == 2:
-                port.setData(42)
-                time.sleep(.5)
+                trigg_value = 42
             elif self.stimlist[N] == 3:
-                port.setData(43)
-                time.sleep(.5)
+                trigg_value = 43
             elif self.stimlist[N] == 4:
-                port.setData(44)
-                time.sleep(.5)
+                trigg_value = 44
         elif self.stimpr[N] == 'medium_prob':
             if self.stimlist[N] == 1:
-                port.setData(51)
-                time.sleep(.5)
+                trigg_value = 51
             elif self.stimlist[N] == 2:
-                port.setData(52)
-                time.sleep(.5)
+                trigg_value = 52
             elif self.stimlist[N] == 3:
-                port.setData(53)
-                time.sleep(.5)
+                trigg_value = 53
             elif self.stimlist[N] == 4:
-                port.setData(54)
-                time.sleep(.5)
+                trigg_value = 54
         elif self.stimpr[N] == 'low_prob':
             if self.stimlist[N] == 1:
-                port.setData(61)
-                time.sleep(.5)
+                trigg_value = 61
             elif self.stimlist[N] == 2:
-                port.setData(62)
-                time.sleep(.5)
+                trigg_value = 62
             elif self.stimlist[N] == 3:
-                port.setData(63)
-                time.sleep(.5)
+                trigg_value = 63
             elif self.stimlist[N] == 4:
-                port.setData(64)
-                time.sleep(.5)
+                trigg_value = 64
+        port.setData(trigg_value)
+        time.sleep(.005)
+        port.setData(0)
                 
     def quit_presentation(self):
         self.print_to_screen("Exiting...\nSaving data...")
@@ -1197,24 +1202,24 @@ class Experiment:
         
     def fixation_cross(self):
         
-        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, 1920, 128)
+        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, screen_width, 128)
         
         outer = visual.Circle(win=self.mywindow, units='deg', radius=size,
-                              fillColor='black', opacity=1)
-        inner = visual.Circle(win=self.mywindow, units='deg', radius=size/3,
-                              fillColor='black', opacity=1)
+                              color=(0,0,0), opacity=1)
+        inner = visual.Circle(win=self.mywindow, units='deg', radius=size/2,
+                              color=(0,0,0), opacity=1)
         cross = visual.ShapeStim(
             win=self.mywindow, vertices='cross',
             units='deg', size=(size, size),
             ori=0.0, pos=(0, 0), anchor='center',
-            lineWidth=1.0, colorSpace='rgb',  lineColor='white', fillColor='white',
+            lineWidth=1.0, color=(255, 255, 255),
             opacity=1, depth=-8.0, interpolate=True)
         
         outer.draw()
         cross.draw()
         inner.draw()
     
-    def resting_period(self, fixation_cross, experiment):
+    def resting_period(self, outer, cross, inner, experiment):
         """Resting time with eyes closed."""
 
         self.print_to_screen("Fermez vos yeux.")
@@ -1229,22 +1234,27 @@ class Experiment:
             # self.mywindow.flip()
         rest_time = core.CountdownTimer(self.settings.rest_time)
         while rest_time.getTime() > 1:
-            fixation_cross.draw()
+            outer.draw()
+            cross.draw()
+            inner.draw()
             self.mywindow.flip()
-        s.play()
+        if not debug_mode:
+            s.play()
         while rest_time.getTime() > 0:
-            fixation_cross.draw()
+            outer.draw()
+            cross.draw()
+            inner.draw()
             self.mywindow.flip()
 
 
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
 
-        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, 1920, 128)
+        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, screen_width, 128)
 
         # stimulus init
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[1]],
-                                pos=(0,0), units='deg', size=(size, size), opacity=1) # try setting the opacity to 0 if any issue in continuation
+                                pos=(0,0), units='deg', size=(size, size), opacity=0) # try setting the opacity to 0 if any issue in continuation
 
 
         # fixation cross init
@@ -1256,20 +1266,20 @@ class Experiment:
         
         
         outer = visual.Circle(win=self.mywindow, units='deg', radius=size/6,
-                              fillColor='black', opacity=.6)
+                              fillColor='black', opacity=1)
         inner = visual.Circle(win=self.mywindow, units='deg', radius=size/36,
-                              fillColor='black', opacity=.6)
+                              fillColor='black', opacity=1)
         cross = visual.ShapeStim(
             win=self.mywindow, vertices='cross',
             units='deg', size=(size/3, size/3),
-            ori=0.0, pos=(0, 0), anchor='center',
-            lineWidth=.5, colorSpace='rgb',  lineColor='white', fillColor='white',
-            opacity=.6, depth=-8.0, interpolate=True)
+            ori=0.0, pos=(0, 0),
+            lineWidth=.5,  lineColor='white', fillColor='white',
+            opacity=1, depth=-8.0, interpolate=True)
         
         # Photodiode configuration
         pixel = visual.Rect(win=self.mywindow, units='pix',
-                            pos=(-1920/2, 1080/2),
-                            size=(50, 50),
+                            pos=(0, screen_height/2),
+                            size=(screen_width, 200),
                             fillColor='black', lineColor='black')
         pixel.setAutoDraw(True) # set to True/False to activate/deactivate
 
@@ -1353,13 +1363,16 @@ class Experiment:
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]],
                                         pos=(0,0), units='deg', size=(size, size), opacity=1)
                 stim.draw()
+                pixel.setAutoDraw(False)
                 # fixation_cross.draw()
                 outer.draw()
                 cross.draw()
                 inner.draw()
                 self.mywindow.flip()
+                if meg_session and cycle == 0:
+                    self.send_trigger(N)
 
-                if cycle == 1:
+                if cycle == 1: # check next time if 0 or 1
                     if first_trial_in_block:
                         stim_RSI = 0.0
                     else:
@@ -1372,13 +1385,11 @@ class Experiment:
                 if cycle == 1:
                     trial_clock.reset()
                 (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock)
-                if meg_session:
-                    (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
-                    self.send_trigger(N)
+                # if meg_session:
+                #     (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
+                
                 with self.shared_data_lock:
                     self.trial_phase = "after_reaction"
-                if meg_session:
-                    port.setData(0)
 
                 now = datetime.now()
                 stim_RT_time = now.strftime('%H:%M:%S.%f')
@@ -1397,8 +1408,13 @@ class Experiment:
                 # correct response
                 elif response == self.stimlist[N]:
                 # elif str(respKeys) == str(self.stimlist[N]):
+                    if meg_session:
+                        port.setData(202)
+                        time.sleep(.005)
+                        port.setData(0)
                     # start of the RSI timer and offset of the stimulus
                     stim.setOpacity(0)
+                    pixel.setAutoDraw(True)
                     stim.draw()
                     self.mywindow.flip()
                     RSI_clock.reset()
@@ -1430,6 +1446,10 @@ class Experiment:
 
                 # wrong response --> let's wait for the next response
                 else:
+                    if meg_session:
+                        port.setData(404)
+                        time.sleep(.005)
+                        port.setData(0)
                     stimACC = 1
                     accs_in_block.append(1)
                     if self.stimpr[N] == 'training':
@@ -1477,7 +1497,7 @@ class Experiment:
                     self.trial_phase = "before stimulus"
                     self.last_RSI = - 1
 
-                self.resting_period(fixation_cross, self.settings)
+                self.resting_period(outer, cross, inner, self.settings)
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
@@ -1491,7 +1511,7 @@ class Experiment:
                     self.trial_phase = "before stimulus"
                     self.last_RSI = - 1
 
-                self.resting_period(fixation_cross, self.settings)
+                self.resting_period(outer, cross, inner, self.settings)
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
@@ -1519,9 +1539,9 @@ class Experiment:
                 core.wait(10)
                 break
 
-    def run(self, full_screen=False, mouse_visible=True, window_gammaErrorPolicy='raise',
+    def run(self, full_screen=full_screen, mouse_visible=mouse_visible, window_gammaErrorPolicy='raise',
             meg_session=meg_session,
-            eyetrack=False):
+            eyetracking=eyetracking):
 
         # ensure all required folders are created, if not creates them
         ensure_dir(os.path.join(self.workdir_path, "logs"))
@@ -1550,12 +1570,17 @@ class Experiment:
         # if not op.exists(op.join(self.workdir_path, 'stimuli', images[0])):
         #     raise Exception('hqjd')
 
+
         # create dictionary matching images and corresponding stimulus number
-        self.image_dict = {1:op.join(self.workdir_path, 'stimuli', images[0]),
-                           2:op.join(self.workdir_path, 'stimuli', images[1]),
-                           3:op.join(self.workdir_path, 'stimuli', images[2]),
-                           4:op.join(self.workdir_path, 'stimuli', images[3]),
-                           5:op.join(self.workdir_path, 'stimuli', images[4])}
+        if meg_session:
+            self.image_dict = {1:op.join(self.workdir_path, 'stimuli', images[0]),
+                               2:op.join(self.workdir_path, 'stimuli', images[1])}
+        else:
+            self.image_dict = {1:op.join(self.workdir_path, 'stimuli', images[0]),
+                            2:op.join(self.workdir_path, 'stimuli', images[1]),
+                            3:op.join(self.workdir_path, 'stimuli', images[2]),
+                            4:op.join(self.workdir_path, 'stimuli', images[3]),
+                            5:op.join(self.workdir_path, 'stimuli', images[4])}
         
         # read instruction strings
         inst_feedback_path = os.path.join(self.workdir_path, "inst_and_feedback.txt")
@@ -1568,13 +1593,30 @@ class Experiment:
 
         # init window
         self.monitor_settings()
-        with visual.Window(size=(1920, 1080), color='Ivory', fullscr=False,
+        with visual.Window(size=(screen_width, screen_height), color='white', fullscr=full_screen,
                            monitor=self.mymonitor, units="pix", gammaErrorPolicy=window_gammaErrorPolicy) as self.mywindow:
 
             self.mywindow.mouseVisible = mouse_visible
 
             # check frame rate
             self.frame_check()
+            
+            """ms_per_frame = self.mywindow.getMsPerFrame(nFrames=120)
+            self.frame_time = ms_per_frame[0]
+            self.frame_sd = ms_per_frame[1]
+            self.frame_rate = self.mywindow.getActualFrameRate()"""
+
+            print(str(self.frame_time))
+            print(str(self.frame_sd))
+            print(str(self.frame_rate))
+           
+            if meg_session:
+                # Start the MEG recordings
+                port.setData(0)
+                time.sleep(.005)
+                port.setData(252)
+                time.sleep(.005)
+                port.setData(0)
 
             # show experiment screen
             self.presentation()
@@ -1588,9 +1630,9 @@ class Experiment:
 
             if meg_session:
                 # Stop MEG recordings
-                time.sleep(1)
+                time.sleep(2)
                 port.setData(253)
-                time.sleep(1)
+                time.sleep(.005)
                 port.setData(0)
 
 
