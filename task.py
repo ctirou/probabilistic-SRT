@@ -2,6 +2,7 @@ from psychopy import visual, core, event, gui, monitors, sound, parallel
 import psychtoolbox as ptb
 # import pygame
 # import pygame_menu
+from pygame_menu import widgets
 from serial import Serial
 import time
 import shelve
@@ -17,10 +18,9 @@ import pandas as pd
 import numpy as np
 from math import atan2, degrees
 
-debug_mode = True
+debug_mode = False
 meg_session = False
 eyetracking = False
-
 
 if debug_mode:
     mouse_visible = True
@@ -57,8 +57,10 @@ def serial_port(port='COM1', baudrate=9600, timeout=0):
     return open_port
 
 if meg_session:
-    addressPortParallel = '0x3FE8'
-    # addressPortParallel = '0x3FF8'
+    try:
+        addressPortParallel = '0x3FE8'
+    except:
+        addressPortParallel = '0x3FF8'
 
     #receive responses
     port_s = serial_port()
@@ -80,19 +82,6 @@ def normalize_string(string, blank_char):
     string = string.replace(' ', blank_char)
     return string
 
-def pixel_to_degrees(h, d, r, size_px):
-    """
-        h: height of the monitor in cm
-        d: distance from the participant to the monitor in cm
-        r: vertical resolution of the monitor in pixels
-        size_px: stimulus size in pixels
-    """
-    # calculate the number of degrees that correspond to a single pixel
-    deg_per_px = degrees(atan2(.5 * h, d)) / (.5 * r)
-    
-    size_in_deg = size_px * deg_per_px
-    
-    return size_in_deg
     
 class ExperimentSettings:
     """
@@ -329,9 +318,9 @@ class ExperimentSettings:
                 self.current_session = 2
             if debug_mode:
                 self.blocks_in_session = 6
-                self.trials_in_pretrain = 5
-                self.trials_in_tBlock = 5
-                self.trials_in_block = 5
+                self.trials_in_pretrain = 1
+                self.trials_in_tBlock = 1
+                self.trials_in_block = 1
             else:
                 self.blocks_in_session = returned_data[1]
                 self.trials_in_pretrain = returned_data[2]
@@ -398,6 +387,7 @@ class ExperimentSettings:
     #     selfEdf = EyeLink.tracker(1920, 1080, edfFileName)
     #     EyeLink.tracker.sendMessage(selfEdf, 'H')
     #     EyeLink.tracker.close(selfEdf, edfFileName)
+    
 
 
 class InstructionHelper:
@@ -1009,6 +999,25 @@ class Experiment:
                 self.stimtrial[all_trial_Nr] = current_trial_num
                 self.stimblock[all_trial_Nr] = block_num
 
+    def pixel_to_degrees(self, size_px):
+        """
+            h: height of the monitor in cm
+            d: distance from the participant to the monitor in cm
+            r: vertical resolution of the monitor in pixels
+            size_px: size in pixels
+        """
+        
+        h = self.settings.monitor_height
+        d = self.settings.monitor_distance
+        r = screen_width
+        
+        # calculate the number of degrees that correspond to a single pixel
+        deg_per_px = degrees(atan2(.5 * h, d)) / (.5 * r)
+        
+        size_in_deg = size_px * deg_per_px
+        
+        return size_in_deg
+
 
     def participant_id(self):
         """Find out the current subject and read subject settings / progress if he/she already has any data."""
@@ -1082,6 +1091,36 @@ class Experiment:
         self.frame_sd = ms_per_frame[1]
         self.frame_rate = self.mywindow.getActualFrameRate()
 
+    def prog_bar(self, N):
+        
+        # width = self.pixel_to_degrees(1000)
+        # height = self.pixel_to_degrees(150)
+        progress = (N/self.settings.get_maxtrial('test'))*1000
+        # prog = self.pixel_to_degrees(progress)
+        
+        bar_outline = visual.Rect(win=self.mywindow, units='pix',
+                            pos=(-500, -screen_width/2),
+                            size=(1000, 20),
+                            fillColor=None,
+                            lineColor='black', lineWidth=1)
+        bar = visual.Rect(win=self.mywindow, units='pix',
+                    pos=(-500, -screen_width/2),
+                    size=(progress, 20),
+                    fillColor='blue',
+                    lineWidth=0)
+        
+        bar.draw()
+        bar_outline.draw()
+        
+    def drawBar(self, N):
+        progress = (N/self.settings.get_maxtrial('test'))*100
+        bar = widgets.ProgressBar(title='prog_bar', default=0, width=progress,
+                                  box_background_color='white',
+                                  box_border_color='black', box_border_width=2,
+                                  box_margin=(-500, -screen_width/2),
+                                  box_progress_color='green',
+                                  progress_text_enabled=True, progress_text_align='CENTER')
+        
 
     def show_feedback(self, N, responses_in_block, accs_in_block, RT_all_list):
         """ Display feedback in the end of the blocks, showing some data about speed and accuracy."""
@@ -1091,10 +1130,25 @@ class Experiment:
 
         rt_mean = float(sum(RT_all_list)) / len(RT_all_list)
         rt_mean_str = str(rt_mean)[:5].replace('.', ',')
-
+        
+        progress = (N/self.settings.get_maxtrial('test'))*1000
+        
+        bar_outline = visual.Rect(win=self.mywindow, units='pix',
+                            pos=(-500, -screen_width/2),
+                            size=(1000, 20),
+                            fillColor=None,
+                            lineColor='black', lineWidth=1)
+        bar = visual.Rect(win=self.mywindow, units='pix',
+                    pos=(-500, -screen_width/2),
+                    size=(progress, 20),
+                    fillColor='blue',
+                    lineWidth=0)
+        
+        bar.draw()
+        bar_outline.draw()
+        
         whatnow = self.instructions.feedback_RT_acc(
             rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
-
 
     def wait_for_response1(self, expected_response, response_clock):
         press = event.waitKeys(keyList=self.settings.get_key_list(),
@@ -1118,78 +1172,17 @@ class Experiment:
 
     def send_trigger(self, N):
         
-        # d = {'training': [1, 2, 3, 4, 5],
-        #      'no transition': [11, 12, 13, 14, 15],
-        #      'random': [21, 22, 23, 24, 25],
-        #      'deterministic': [31, 32, 33, 34, 35],
-        #      'high_prob': [41, 42, 43, 44, 45],
-        #      'medium_prob': [51, 52, 53, 54, 55],
-        #      'low_prob': [61, 62, 63, 64, 65]}
+        d = {'training': [1, 2, 3, 4, 5],
+             'no transition': [11, 12, 13, 14, 15],
+             'random': [21, 22, 23, 24, 25],
+             'deterministic': [31, 32, 33, 34, 35],
+             'high_prob': [41, 42, 43, 44, 45],
+             'medium_prob': [51, 52, 53, 54, 55],
+             'low_prob': [61, 62, 63, 64, 65]}
     
-
-        if self.stimpr[N] == 'training':
-            if self.stimlist[N] == 1:
-                trigg_value = 1
-            elif self.stimlist[N] == 2:
-                trigg_value = 2
-            elif self.stimlist[N] == 3:
-                trigg_value = 3
-            elif self.stimlist[N] == 4:
-                trigg_value = 4
-        elif self.stimpr[N] == 'no transition':
-            if self.stimlist[N] == 1:
-                trigg_value = 11
-            elif self.stimlist[N] == 2:
-                trigg_value = 12
-            elif self.stimlist[N] == 3:
-                trigg_value = 13
-            elif self.stimlist[N] == 4:
-                trigg_value = 14
-        elif self.stimpr[N] == 'random':
-            if self.stimlist[N] == 1:
-                trigg_value = 21
-            elif self.stimlist[N] == 2:
-                trigg_value = 22
-            elif self.stimlist[N] == 3:
-                trigg_value = 23
-            elif self.stimlist[N] == 4:
-                trigg_value = 24
-        elif self.stimpr[N] == 'deterministic':
-            if self.stimlist[N] == 1:
-                trigg_value = 31
-            elif self.stimlist[N] == 2:
-                trigg_value = 32
-            elif self.stimlist[N] == 3:
-                trigg_value = 33
-            elif self.stimlist[N] == 4:
-                trigg_value = 34
-        elif self.stimpr[N] == 'high_prob':
-            if self.stimlist[N] == 1:
-                trigg_value = 41
-            elif self.stimlist[N] == 2:
-                trigg_value = 42
-            elif self.stimlist[N] == 3:
-                trigg_value = 43
-            elif self.stimlist[N] == 4:
-                trigg_value = 44
-        elif self.stimpr[N] == 'medium_prob':
-            if self.stimlist[N] == 1:
-                trigg_value = 51
-            elif self.stimlist[N] == 2:
-                trigg_value = 52
-            elif self.stimlist[N] == 3:
-                trigg_value = 53
-            elif self.stimlist[N] == 4:
-                trigg_value = 54
-        elif self.stimpr[N] == 'low_prob':
-            if self.stimlist[N] == 1:
-                trigg_value = 61
-            elif self.stimlist[N] == 2:
-                trigg_value = 62
-            elif self.stimlist[N] == 3:
-                trigg_value = 63
-            elif self.stimlist[N] == 4:
-                trigg_value = 64
+        trigg_value = d[self.stimpr[N]][self.stimlist[N]-1]
+        print(trigg_value)
+        
         port.setData(trigg_value)
         time.sleep(.005)
         port.setData(0)
@@ -1202,7 +1195,7 @@ class Experiment:
         
     def fixation_cross(self):
         
-        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, screen_width, 128)
+        size = self.pixel_to_degrees(128)
         
         outer = visual.Circle(win=self.mywindow, units='deg', radius=size,
                               color=(0,0,0), opacity=1)
@@ -1245,12 +1238,11 @@ class Experiment:
             cross.draw()
             inner.draw()
             self.mywindow.flip()
-
-
+         
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
 
-        size = pixel_to_degrees(self.settings.monitor_height, self.settings.monitor_distance, screen_width, 128)
+        size = self.pixel_to_degrees(128)
 
         # stimulus init
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[1]],
@@ -1371,7 +1363,6 @@ class Experiment:
                 self.mywindow.flip()
                 if meg_session and cycle == 0:
                     self.send_trigger(N)
-
                 if cycle == 1: # check next time if 0 or 1
                     if first_trial_in_block:
                         stim_RSI = 0.0
@@ -1517,6 +1508,8 @@ class Experiment:
 
                 timer = core.CountdownTimer(self.settings.rest_time+3)
                 while timer.getTime() > 0:
+                    # self.prog_bar(N)
+                    # self.drawBar(N)
                     self.show_feedback(N, responses_in_block, accs_in_block, RT_all_list)
 
                 responses_in_block = 0
@@ -1543,7 +1536,7 @@ class Experiment:
             meg_session=meg_session,
             eyetracking=eyetracking):
 
-        # ensure all required folders are created, if not creates them
+        # ensure all required folders are created
         ensure_dir(os.path.join(self.workdir_path, "logs"))
         ensure_dir(os.path.join(self.workdir_path, "settings"))
         ensure_dir(os.path.join(self.workdir_path, "sequences"))
@@ -1601,11 +1594,6 @@ class Experiment:
             # check frame rate
             self.frame_check()
             
-            """ms_per_frame = self.mywindow.getMsPerFrame(nFrames=120)
-            self.frame_time = ms_per_frame[0]
-            self.frame_sd = ms_per_frame[1]
-            self.frame_rate = self.mywindow.getActualFrameRate()"""
-
             print(str(self.frame_time))
             print(str(self.frame_sd))
             print(str(self.frame_rate))
