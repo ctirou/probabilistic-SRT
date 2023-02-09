@@ -18,9 +18,9 @@ import pandas as pd
 import numpy as np
 from math import atan2, degrees
 
-debug_mode = False
+debug_mode = True
 meg_session = False
-eyetracking = False
+eyetracking = True
 
 if debug_mode:
     mouse_visible = True
@@ -29,7 +29,7 @@ if debug_mode:
     screen_height = 500
     dummy_mode = True
 else:
-    mouse_visible = True
+    mouse_visible = False
     full_screen = True
     screen_width = 1920
     screen_height = 1080
@@ -39,6 +39,8 @@ else:
 if eyetracking:
     import pylink
     from EyeLinkCoreGraphicsPsychoPy import EyeLinkCoreGraphicsPsychoPy
+    import sys
+    from string import ascii_letters, digits
 
 def serial_port(port='COM1', baudrate=9600, timeout=0):
     """
@@ -121,6 +123,14 @@ class ExperimentSettings:
         self.sessionstarts = None
         self.blockstarts = None
         self.fb_block = None
+        
+        self.el_tracker = None
+        # AOI (area of interest) is a square with the same origin as the stimuli, this size means the size of this square's side
+        self.AOI_size = None
+        # count of samples used to identify fixation
+        self.fixation_threshold = None
+        # dispersion threshold in cm
+        self.dispersion_threshold = None
 
         self.settings_file_path = settings_file_path
         self.reminder_file_path = reminder_file_path
@@ -162,6 +172,11 @@ class ExperimentSettings:
                 self.whether_warning = settings_file['whether_warning']
                 self.speed_warning = settings_file['speed_warning']
                 self.acc_warning = settings_file['acc_warning']
+                
+                if eyetracking:
+                    self.AOI_size = settings_file['AOI_size']
+                    self.fixation_threshold = settings_file['fixation_threshold']
+                    self.dispersion_threshold = settings_file['dispersion_threshold']
 
         except Exception as exception:
             self.__init__(self.settings_file_path, self.reminder_file_path, self.sequence_file_path)
@@ -196,6 +211,12 @@ class ExperimentSettings:
             settings_file['whether_warning'] = self.whether_warning
             settings_file['speed_warning'] = self.speed_warning
             settings_file['acc_warning'] = self.acc_warning
+            
+            if eyetracking:
+                settings_file['AOI_size'] = self.AOI_size
+                settings_file['fixation_threshold'] = self.fixation_threshold
+                settings_file['dispersion_threshold'] = self.dispersion_threshold
+
 
     def write_out_reminder(self):
         """Write out a short summary of the settings into a text file."""
@@ -220,6 +241,11 @@ class ExperimentSettings:
                             'Trials\\Block:' + '\t' + str(self.trials_in_block) + '\n' +
                             'RSI:' + '\t' + str(self.RSI_time).replace('.', ',') + '\n'
                             'Resting time: ' + '\t' + str(self.rest_time).replace('.', ',') + '\n')
+            
+            if eyetracking:
+                reminder += str('AOI size:' + '\t' + str(self.AOI_size).replace('.', ',') + '\n' +
+                                'Fixation threshold:' + '\t' + str(self.fixation_threshold) + '\n' +
+                                'Dispersion threshold:' + '\t' + str(self.dispersion_threshold).replace('.', ',') + '\n')
 
             reminder += str('\n' +
                             'The following settings are valid and applies for all persons\n\n' +
@@ -1070,6 +1096,116 @@ class Experiment:
         self.mymonitor.setWidth(self.settings.monitor_width)
         self.mymonitor.saveMon()
 
+    def init_eyetracker(self):
+        """Connect to the EyeLink Host PC.
+        
+        The Host IP address, by default, is "100.1.1.1".
+        the "el_tracker" objected created here can be accessed through the Pylink
+        Set the Host PC address to "None" (without quotes) to run the script in "Dummy Mode"""
+        
+        if dummy_mode:
+            el_tracker = pylink.EyeLink(None)
+        else:
+            try:
+                el_tracker = pylink.EyeLink("100.1.1.1")
+            except RuntimeError as error:
+                print("ERROR:", error)
+                core.quit()
+                sys.exit()
+        self.el_tracker = el_tracker
+    
+    def open_edf_file(self):
+        """Open an EDF data file on the Host PC"""
+        
+        edf_file = "eL_file_" + str(self.subject_number) + ".edf"
+        try:
+            self.el_tracker.openDataFile(edf_file)
+        except RuntimeError as err:
+            print('ERROR:', err)
+            # close the link if we have one open
+            if self.el_tracker.isConnected():
+                self.el_tracker.close()
+            core.quit()
+            sys.exit()
+    
+    def el_config(self):
+        """ Configure the tracker"""
+        
+        self.el_tracker.setOfflineMode()
+        eyelink_ver = 0
+        if not dummy_mode:
+            vstr = self.el_tracker.getTrackerVersionString()
+            eyelink_ver = int(vstr.split()[-1].split('.')[0])
+            print('Running experiment on %s, version %d' % (vstr, eyelink_ver))
+        
+        # File and Link data control
+        # what eye events to save in the EDF file, include everything by default
+        file_event_flags = 'LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON,INPUT'
+        # what eye events to make available over the link, include everything by default
+        link_event_flags = 'LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON,FIXUPDATE,INPUT'
+        # what sample data to save in the EDF data file and to make available
+        # over the link, include the 'HTARGET' flag to save head target sticker
+        # data for supported eye trackers
+        if eyelink_ver > 3:
+            file_sample_flags = 'LEFT,RIGHT,GAZE,HREF,RAW,AREA,HTARGET,GAZERES,BUTTON,STATUS,INPUT'
+            link_sample_flags = 'LEFT,RIGHT,GAZE,GAZERES,AREA,HTARGET,STATUS,INPUT'
+        else:
+            file_sample_flags = 'LEFT,RIGHT,GAZE,HREF,RAW,AREA,GAZERES,BUTTON,STATUS,INPUT'
+            link_sample_flags = 'LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS,INPUT'
+        self.el_tracker.sendCommand("file_event_filter = %s" % file_event_flags)
+        self.el_tracker.sendCommand("file_sample_data = %s" % file_sample_flags)
+        self.el_tracker.sendCommand("link_event_filter = %s" % link_event_flags)
+        self.el_tracker.sendCommand("link_sample_data = %s" % link_sample_flags)
+        # Optional tracking parameters
+        # Sample rate, 250, 500, 1000, or 2000, check your tracker specification
+        # if eyelink_ver > 2:
+        #     self.el_tracker.sendCommand("sample_rate 1000")
+        # Choose a calibration type, H3, HV3, HV5, HV13 (HV = horizontal/vertical),
+        self.el_tracker.sendCommand("calibration_type = HV9")
+
+    def el_calibration(self):
+        """ Set up a graphic environment for calibration/"""
+                
+        # Write a DISPLAY_COORDS message to the EDF file
+        # Data Viewer needs this piece of info for proper visualization, see Data
+        # Viewer User Manual, "Protocol for EyeLink Data to Viewer Integration"
+        dv_coords = "DISPLAY_COORDS  0 0 %d %d" % (screen_width - 1, screen_height - 1)
+        self.el_tracker.sendMessage(dv_coords)
+
+        # Configure a graphics environment (genv) for tracker calibration
+        genv = EyeLinkCoreGraphicsPsychoPy(self.el_tracker, self.mywindow)
+        print(genv)  # print out the version number of the CoreGraphics library
+
+        # Set background and foreground colors for the calibration target
+        # in PsychoPy, (-1, -1, -1)=black, (1, 1, 1)=white, (0, 0, 0)=mid-gray
+        foreground_color = (-1, -1, -1)
+        background_color = win.color
+        genv.setCalibrationColors(foreground_color, background_color)
+
+        # Set up the calibration target
+        #
+        # The target could be a "circle" (default), a "picture", a "movie" clip,
+        # or a rotating "spiral". To configure the type of calibration target, set
+        # genv.setTargetType to "circle", "picture", "movie", or "spiral"
+        
+        genv.setTargetType('picture')
+        genv.setPictureTarget(os.path.join('images', 'fixTarget.bmp'))
+
+        # Configure the size of the calibration target (in pixels)
+        # this option applies only to "circle" and "spiral" targets
+        # genv.setTargetSize(24)
+
+        # Beeps to play during calibration, validation and drift correction
+        # parameters: target, good, error
+        #     target -- sound to play when target moves
+        #     good -- sound to play on successful operation
+        #     error -- sound to play on failure or interruption
+        # Each parameter could be ''--default sound, 'off'--no sound, or a wav file
+        genv.setCalibrationSounds('', '', '')
+
+        # Request Pylink to use the PsychoPy window we opened above for calibration
+        pylink.openGraphicsEx(genv)
+
     def print_to_screen(self, mytext):
         """Display any string on the screen."""
 
@@ -1540,11 +1676,15 @@ class Experiment:
         ensure_dir(os.path.join(self.workdir_path, "logs"))
         ensure_dir(os.path.join(self.workdir_path, "settings"))
         ensure_dir(os.path.join(self.workdir_path, "sequences"))
+        if eyetracking:
+            ensure_dir(os.path.join(self.workdir_path, "results"))
 
         # load experiment settings if exist or ask the user to specify them
         all_settings_file_path = os.path.join(self.workdir_path, "settings", "settings")
         reminder_file_path = os.path.join(self.workdir_path, "settings", "settings_reminder.txt")
         sequence_file_path = os.path.join(self.workdir_path, "sequences")
+        if eyetracking:
+            results_folder_path = os.path.join(self.workdir_path, "results")
         self.settings = ExperimentSettings(all_settings_file_path, reminder_file_path, sequence_file_path)
         self.all_settings_def()
 
