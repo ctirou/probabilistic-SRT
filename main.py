@@ -21,20 +21,18 @@ from math import atan2, degrees
 debug_mode = False
 meg_session = False
 eyetracking = True
+use_retina = True
 
 if debug_mode:
     mouse_visible = True
     full_screen = False
     screen_width = 600
     screen_height = 500
-    dummy_mode = True
 else:
     mouse_visible = False
     full_screen = True
     screen_width = 1920
     screen_height = 1080
-    dummy_mode = False
-
 
 if eyetracking:
     import pylink
@@ -1103,15 +1101,12 @@ class Experiment:
         the "el_tracker" objected created here can be accessed through the Pylink
         Set the Host PC address to "None" (without quotes) to run the script in "Dummy Mode"""
         
-        if dummy_mode:
-            self.el_tracker = pylink.EyeLink(None)
-        else:
-            try:
-                self.el_tracker = pylink.EyeLink("100.1.1.1")
-            except RuntimeError as error:
-                print("ERROR:", error)
-                core.quit()
-                sys.exit()
+        try:
+            self.el_tracker = pylink.EyeLink("100.1.1.1") # enter the host pc ip adress, must be connected to with an ethernet cable
+        except RuntimeError as error:
+            print("ERROR:", error)
+            core.quit()
+            sys.exit()
     
     def open_edf_file(self):
         """Open an EDF data file on the Host PC"""
@@ -1127,16 +1122,17 @@ class Experiment:
                 self.el_tracker.close()
             core.quit()
             sys.exit()
+        preamble_text = 'SUBJECT ID: %s' % self.subject_number
+        self.el_tracker.sendCommand("add_file_preamble_text '%s'" % preamble_text)
+
     
     def EL_config(self):
         """ Configure the tracker"""
         
         self.el_tracker.setOfflineMode()
-        eyelink_ver = 0
-        if not dummy_mode:
-            vstr = self.el_tracker.getTrackerVersionString()
-            eyelink_ver = int(vstr.split()[-1].split('.')[0])
-            print('Running experiment on %s, version %d' % (vstr, eyelink_ver))
+        vstr = self.el_tracker.getTrackerVersionString()
+        eyelink_ver = int(vstr.split()[-1].split('.')[0])
+        print('Running experiment on %s, version %d' % (vstr, eyelink_ver))
         
         # File and Link data control
         # what eye events to save in the EDF file, include everything by default
@@ -1162,6 +1158,16 @@ class Experiment:
         #     self.el_tracker.sendCommand("sample_rate 1000")
         # Choose a calibration type, H3, HV3, HV5, HV13 (HV = horizontal/vertical),
         self.el_tracker.sendCommand("calibration_type = HV9")
+        # Set a gamepad button to accept calibration/drift check target
+        # You need a supported gamepad/button box that is connected to the Host PC
+        self.el_tracker.sendCommand("button_function 5 'accept_target_fixation'")
+
+        # Optional -- Shrink the spread of the calibration/validation targets
+        # if the default outermost targets are not all visible in the bore.
+        # The default <x, y display proportion> is 0.88, 0.83 (88% of the display
+        # horizontally and 83% vertically)
+        self.el_tracker.sendCommand('calibration_area_proportion 0.88 0.83')
+        self.el_tracker.sendCommand('validation_area_proportion 0.88 0.83')    
 
     def EL_calibration(self):
         """ Set up a graphic environment for calibration/"""
@@ -1208,43 +1214,45 @@ class Experiment:
         
         self.el_tracker.doTrackerSetup()
         
-    def EL_terminate(self):
+    def EL_disconnect(self):
         
         self.el_tracker = pylink.getEYELINK()
         
-        # Put tracker in Offline mode
-        self.el_tracker.setOfflineMode()
+        if self.el_tracker.isConnected():
+            
+            # Put tracker in Offline mode
+            self.el_tracker.setOfflineMode()
 
-        # Clear the Host PC screen and wait for 500 ms
-        self.el_tracker.sendCommand('clear_screen 0')
-        pylink.msecDelay(500)
+            # Clear the Host PC screen and wait for 500 ms
+            self.el_tracker.sendCommand('clear_screen 0')
+            pylink.msecDelay(500)
 
-        # Close the edf data file on the Host
-        self.el_tracker.closeDataFile()
+            # Close the edf data file on the Host
+            self.el_tracker.closeDataFile()
 
-        # Show a file transfer message on the screen
-        self.print_to_screen('EDF data is transferring from EyeLink Host PC...')
+            # Show a file transfer message on the screen
+            self.print_to_screen('EDF data is transferring from EyeLink Host PC...')
 
-        # Download the EDF data file from the Host PC to a local data folder
-        # parameters: source_file_on_the_host, destination_file_on_local_drive
-        # edf_file = f"eL_{self.subject_number}_{self.settings.current_session}.edf"
-        edf_file = f"eL_file.edf"
-        # local_edf = os.path.join(f"local_eL_{self.subject_number}_{self.settings.current_session}.edf")
-        local_edf = os.path.join(f"loc_eL.edf")
-        try:
-            self.el_tracker.receiveDataFile(edf_file, local_edf)
-        except RuntimeError as error:
-            print('ERROR:', error)
+            # Download the EDF data file from the Host PC to a local data folder
+            # parameters: source_file_on_the_host, destination_file_on_local_drive
+            # edf_file = f"eL_{self.subject_number}_{self.settings.current_session}.edf"
+            edf_file = "eL_file.edf"
+            # local_edf = os.path.join(f"local_eL_{self.subject_number}_{self.settings.current_session}.edf")
+            local_edf = os.path.join("loc_eL.edf")
+            try:
+                self.el_tracker.receiveDataFile(edf_file, local_edf)
+            except RuntimeError as error:
+                print('ERROR:', error)
 
-        # Close the data file
-        self.el_tracker.closeDataFile()
-        
-        # Close the link to the tracker.
-        self.el_tracker.close()
+            # Close the data file
+            self.el_tracker.closeDataFile()
+            
+            # Close the link to the tracker.
+            self.el_tracker.close()
 
     def eye_data_callback(self, origGazeData):
-        gazeData = copy.deepcopy(origGazeData)
-        time_stamp = tobii.get_system_time_stamp()
+        # gazeData = copy.deepcopy(origGazeData)
+        # time_stamp = tobii.get_system_time_stamp()
         left_gaze_XY = gazeData['left_gaze_point_on_display_area']
         right_gaze_XY = gazeData['right_gaze_point_on_display_area']
         left_gaze_valid = gazeData['left_gaze_point_validity']
@@ -1686,6 +1694,30 @@ class Experiment:
         else:
             self.instructions.show_unexp_quit(self)
 
+        self.el_tracker = pylink.getEYELINK()
+        self.el_tracker.setOfflineMode()
+
+        try:
+            self.el_tracker.startRecording(1, 1, 1, 1)
+        except RuntimeError as error:
+            print("ERROR:", error)
+            return pylink.TRIAL_ERROR
+        
+        # Allocate some time for the tracker to cache some samples
+        pylink.pumpDelay(100)
+        
+        # determine which eye(s) is/are available
+        # 0- left, 1-right, 2-binocular
+        eye_used = self.el_tracker.eyeAvailable()
+        if eye_used == 1:
+            self.el_tracker.sendMessage("EYE_USED 1 RIGHT")
+        elif eye_used == 0 or eye_used == 2:
+            self.el_tracker.sendMessage("EYE_USED 0 LEFT")
+            eye_used = 0
+        else:
+            print("Error in getting the eye information!")
+            return pylink.TRIAL_ERROR
+        
         RSI.start(self.settings.RSI_time)
 
         while True:
@@ -1839,11 +1871,12 @@ class Experiment:
                                                                 stimRT, stimACC, response, respKeys, respRT, tresptrig])
 
                 if stimACC == 0:
+                    self.el_tracker.sendMessage('Trial #%d' %N)
                     N += 1
                     first_trial_in_block = False
                     break
 
-            # resting period only
+            # resting period only   
             if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
 
                 with self.shared_data_lock:
@@ -1927,10 +1960,6 @@ class Experiment:
             if '.png' in img:
                 images.append(img)
         images.sort()
-        
-        # if not op.exists(op.join(self.workdir_path, 'stimuli', images[0])):
-        #     raise Exception('hqjd')
-
 
         # create dictionary matching images and corresponding stimulus number
         if meg_session:
@@ -1966,7 +1995,7 @@ class Experiment:
             print(str(self.frame_sd))
             print(str(self.frame_rate))
 
-            # EyeLink initialization
+            # initialize EyeLink
             self.EL_init()
             self.open_edf_file()
             self.EL_config()
@@ -1991,7 +2020,7 @@ class Experiment:
             self.instructions.show_ending(self)
             
             # disconnect EyeLink
-            self.EL_terminate()
+            self.EL_disconnect()
 
             if meg_session:
                 # Stop MEG recordings
