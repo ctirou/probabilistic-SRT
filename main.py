@@ -2,7 +2,7 @@ from psychopy import visual, core, event, gui, monitors, sound, parallel
 import psychtoolbox as ptb
 # import pygame
 # import pygame_menu
-from pygame_menu import widgets
+# from pygame_menu import widgets
 from serial import Serial
 import time
 import shelve
@@ -16,10 +16,11 @@ import threading
 import os.path as op
 import pandas as pd
 import numpy as np
-from math import atan2, degrees
+from math import atan2, degrees, fabs
+import copy
 
 debug_mode = False
-meg_session = False
+meg_session = True
 eyetracking = True
 use_retina = True
 
@@ -1157,7 +1158,7 @@ class Experiment:
         # if eyelink_ver > 2:
         #     self.el_tracker.sendCommand("sample_rate 1000")
         # Choose a calibration type, H3, HV3, HV5, HV13 (HV = horizontal/vertical),
-        self.el_tracker.sendCommand("calibration_type = HV9")
+        self.el_tracker.sendCommand("calibration_type = HV3")
         # Set a gamepad button to accept calibration/drift check target
         # You need a supported gamepad/button box that is connected to the Host PC
         self.el_tracker.sendCommand("button_function 5 'accept_target_fixation'")
@@ -1185,7 +1186,8 @@ class Experiment:
         # Set background and foreground colors for the calibration target
         # in PsychoPy, (-1, -1, -1)=black, (1, 1, 1)=white, (0, 0, 0)=mid-gray
         foreground_color = (-1, -1, -1)
-        background_color = self.mywindow.color
+        # background_color = self.mywindow.color
+        background_color = (1, 1, 1)
         genv.setCalibrationColors(foreground_color, background_color)
 
         # Set up the calibration target
@@ -1214,6 +1216,17 @@ class Experiment:
         
         self.el_tracker.doTrackerSetup()
         
+    def EL_abort(self):
+        """Ends recording """
+
+        el_tracker = pylink.getEYELINK()
+
+        # Stop recording
+        if el_tracker.isRecording():
+            # add 100 ms to catch final trial events
+            pylink.pumpDelay(100)
+            el_tracker.stopRecording()
+                    
     def EL_disconnect(self):
         
         self.el_tracker = pylink.getEYELINK()
@@ -1238,7 +1251,7 @@ class Experiment:
             # edf_file = f"eL_{self.subject_number}_{self.settings.current_session}.edf"
             edf_file = "eL_file.edf"
             # local_edf = os.path.join(f"local_eL_{self.subject_number}_{self.settings.current_session}.edf")
-            local_edf = os.path.join("loc_eL.edf")
+            local_edf = os.path.join("%s.edf" % self.subject_number)
             try:
                 self.el_tracker.receiveDataFile(edf_file, local_edf)
             except RuntimeError as error:
@@ -1249,197 +1262,65 @@ class Experiment:
             
             # Close the link to the tracker.
             self.el_tracker.close()
+            
+    def hit_or_not(self, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
+        hit_aoi = False
+        s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
+        while not hit_aoi:
+            # s.play()
+            # Do we have a sample in the sample buffer?
+            # and does it differ from the one we've seen before?
+            new_sample = self.el_tracker.getNewestSample()
+            if new_sample is not None:
+                if old_sample is not None:
+                    if new_sample.getTime() != old_sample.getTime():
+                        # check if the new sample has data for the eye
+                        # currently being tracked; if so, we retrieve the current
+                        # gaze position and PPD (how many pixels correspond to 1
+                        # deg of visual angle, at the current gaze position)
+                        if eye_used == 1 and new_sample.isRightSample():
+                            g_x, g_y = new_sample.getRightEye().getGaze()
+                        if eye_used == 0 and new_sample.isLeftSample():
+                            g_x, g_y = new_sample.getLeftEye().getGaze()
 
-    def eye_data_callback(self, origGazeData):
-        # gazeData = copy.deepcopy(origGazeData)
-        # time_stamp = tobii.get_system_time_stamp()
-        left_gaze_XY = gazeData['left_gaze_point_on_display_area']
-        right_gaze_XY = gazeData['right_gaze_point_on_display_area']
-        left_gaze_valid = gazeData['left_gaze_point_validity']
-        right_gaze_valid = gazeData['right_gaze_point_validity']
+                        # break the while loop if the current gaze position is
+                        # in a 120 x 120 pixels region around the screen centered
+                        fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
+                        if not (fabs(g_x - fix_x) < 60 and fabs(g_y - fix_y) < 60):
+                            s.play()
+                            in_hit_region = False
+                            gaze_start = -1
+                        else:  # gaze outside the hit region, reset variables
+                            # record gaze start time
+                            if not in_hit_region:
+                                if gaze_start == -1:
+                                    gaze_start = core.getTime()
+                                    in_hit_region = True
+                            # check the gaze duration and fire
+                            if in_hit_region:
+                                s.stop()
+                                gaze_dur = core.getTime() - gaze_start
+                                if gaze_dur > minimum_duration:
+                                    hit_aoi = True
+                        # if fabs(g_x - fix_x) < 60 and fabs(g_y - fix_y) < 60:
+                            # record gaze start time
+                            # if not in_hit_region:
+                            #     if gaze_start == -1:
+                            #         gaze_start = core.getTime()
+                            #         in_hit_region = True
+                            # # check the gaze duration and fire
+                            # if in_hit_region:
+                            #     s.stop()
+                            #     gaze_dur = core.getTime() - gaze_start
+                            #     if gaze_dur > minimum_duration:
+                            #         hit_aoi = True
+                        # else:  # gaze outside the hit region, reset variables
+                        #     in_hit_region = False
+                        #     gaze_start = -1
 
-        x_coord = None
-        y_coord = None
-        if left_gaze_valid and right_gaze_valid:
-            x_coord = (left_gaze_XY[0] + right_gaze_XY[0]) / 2
-            y_coord = (left_gaze_XY[1] + right_gaze_XY[1]) / 2
-        elif left_gaze_valid:
-            x_coord = left_gaze_XY[0]
-            y_coord = left_gaze_XY[1]
-        elif right_gaze_valid:
-            x_coord = right_gaze_XY[0]
-            y_coord = right_gaze_XY[1]
-
-        with self.shared_data_lock:
-            if x_coord != None and y_coord != None:
-                self.gaze_data_list.append((x_coord, y_coord))
-            else:
-                self.gaze_data_list.append((None, None))
-
-            if len(self.gaze_data_list) > self.current_sampling_window:
-                self.gaze_data_list.pop(0)
-                assert len(self.gaze_data_list) == self.current_sampling_window
-
-            self.person_data.output_data_buffer.append([self.last_N, self.last_RSI, self.trial_phase, gazeData, time_stamp])
-
-        if self.main_loop_lock.locked():
-            self.main_loop_lock.release()
-
-    def point_is_in_rectangle(self, point, rect_center, rect_size):
-        if abs(point[0] - rect_center[0]) <= rect_size / 2.0 and abs(point[1] - rect_center[1]) <= rect_size / 2.0:
-            return True
-        else:
-            return False
-
-    def ADCS_to_PCMCS(self, pos_ADCS):
-        ''' Convert position from tobii active display coordinate system (ADCS) to PsychoPy coordinate system with cm unit (PCMCS).
-
-            Active display coordinate system: http://developer.tobiipro.com/commonconcepts/coordinatesystems.html
-            PsychoPy coordinate system with cm unit: https://www.psychopy.org/general/units.html
-        '''
-        aspect_ratio = self.mymonitor.getSizePix()[1] / self.mymonitor.getSizePix()[0]
-        monitor_width_cm = self.settings.monitor_width
-        monitor_height_cm = monitor_width_cm * aspect_ratio
-
-        # shift origin from top-left to center
-        shift_x = monitor_width_cm / 2
-        shift_y = monitor_height_cm / 2
-
-        # scale coordinates from normalized coordinates to cm unit coordinates
-        # we also mirror the y coordinates
-        pos_PCMCS = ((pos_ADCS[0] * monitor_width_cm) - shift_x,
-                     ((pos_ADCS[1] * monitor_height_cm) - shift_y) * - 1)
-        return pos_PCMCS
-
-    def distance_ADCS_to_PCMCS(self, distance_ADCS):
-        ''' Convert distance from tobii active display coordinate system (ADCS) to PsychoPy coordinate system with cm unit (PCMCS).
-
-            Active display coordinate system: http://developer.tobiipro.com/commonconcepts/coordinatesystems.html
-            PsychoPy coordinate system with cm unit: https://www.psychopy.org/general/units.html
-        '''
-        aspect_ratio = self.mymonitor.getSizePix()[1] / self.mymonitor.getSizePix()[0]
-        monitor_width_cm = self.settings.monitor_width
-        monitor_height_cm = monitor_width_cm * aspect_ratio
-
-        # scale coordinates from normalized coordinates to cm unit coordinates
-        distance_PCMCS = (distance_ADCS[0] * monitor_width_cm,
-                          distance_ADCS[1] * monitor_height_cm)
-        return distance_PCMCS
-
-    def linear_interpolation(self, gaze_data_list, invalid_index):
-        # Do we have an actual invalid data here?
-        assert (gaze_data_list[invalid_index][0] == None or gaze_data_list[invalid_index][1] == None)
-
-        # Find first valid data before the missing data sample
-        valid_before = invalid_index - 1
-        while (valid_before >= 0 and
-               (gaze_data_list[valid_before][0] == None or gaze_data_list[valid_before][1] == None)):
-            valid_before -= 1
-
-        if valid_before < 0:
-            return None
-
-        # Find first valid data after the missing data sample
-        valid_after = invalid_index + 1
-        while (valid_after < len(gaze_data_list) and
-               (gaze_data_list[valid_after][0] == None or gaze_data_list[valid_after][1] == None)):
-            valid_after += 1
-
-        if valid_after >= len(gaze_data_list):
-            return None
-
-        # We calulate distances in sample count
-        full_distance = valid_after - valid_before
-        before_distance = invalid_index - valid_before
-        after_distance = valid_after - invalid_index
-        before_scale_factor = after_distance / full_distance
-        after_scale_factor = before_distance / full_distance
-
-        new_x = (gaze_data_list[valid_before][0] * before_scale_factor +
-                 gaze_data_list[valid_after][0] * after_scale_factor)
-        new_y = (gaze_data_list[valid_before][1] * before_scale_factor +
-                 gaze_data_list[valid_after][1] * after_scale_factor)
-
-        return (new_x, new_y)
-
-    def wait_for_eye_response(self, expected_eye_pos, fixation_threshold):
-
-        while (True):
-            if 'q' in event.getKeys():
-                if self.main_loop_lock.locked():
-                    self.main_loop_lock.release()
-                return -1
-
-            self.main_loop_lock.acquire()
-
-            with self.shared_data_lock:
-                if len(self.gaze_data_list) < fixation_threshold:
-                    continue
-
-                last_item = self.gaze_data_list[-1]
-
-                # calculate avarage and max distance
-                count = 0
-                sum_x = 0
-                sum_y = 0
-                max_x = -10.0
-                max_y = -10.0
-                min_x = 10.0
-                min_y = 10.0
-                count = 0
-                invalid_count = 0
-                for i in range(len(self.gaze_data_list)):
-                    pos_x = self.gaze_data_list[i][0]
-                    pos_y = self.gaze_data_list[i][1]
-
-                    # We interpolate the invalid data lineary
-                    if pos_x == None or pos_y == None:
-                        invalid_count += 1
-                        interpolated_data = self.linear_interpolation(self.gaze_data_list, i)
-                        if interpolated_data == None:
-                            break
-                        else:
-                            pos_x = interpolated_data[0]
-                            pos_y = interpolated_data[1]
-
-                    if pos_x != None and pos_y != None:
-                        sum_x += pos_x
-                        sum_y += pos_y
-                        max_x = max(max_x, pos_x)
-                        max_y = max(max_y, pos_y)
-                        min_x = min(min_x, pos_x)
-                        min_y = min(min_y, pos_y)
-                        count += 1
-
-                    if count >= fixation_threshold:
-                        break
-
-                    if invalid_count > fixation_threshold * 0.2:
-                        break
-
-                # We have too many invalid data (we allow maximum 20% to be invalid)
-                if invalid_count > fixation_threshold * 0.2:
-                    continue
-
-                # Do we have engough data for a fixation?
-                if count < fixation_threshold:
-                    continue
-
-                # Is the eye data within the given dispersion?
-                dispersion_vector_norm = ((max_x - min_x), (max_y - min_y))
-                dispersion_vector_cm = self.distance_ADCS_to_PCMCS(dispersion_vector_norm)
-                dispersion_cm = dispersion_vector_cm[0] + dispersion_vector_cm[1]
-                if dispersion_cm > self.settings.dispersion_threshold:
-                    continue
-
-                # Calculate fixation position
-                avg_pos_norm = (sum_x / fixation_threshold, sum_y / fixation_threshold)
-                avg_pos_cm = self.ADCS_to_PCMCS(avg_pos_norm)
-
-                if self.point_is_in_rectangle(avg_pos_cm, expected_eye_pos, self.settings.AOI_size):
-                    if self.main_loop_lock.locked():
-                        self.main_loop_lock.release()
-                    return 1 
+                # update the "old_sample"
+                old_sample = new_sample
+        
 
     def print_to_screen(self, mytext):
         """Display any string on the screen."""
@@ -1483,14 +1364,14 @@ class Experiment:
         bar.draw()
         bar_outline.draw()
         
-    def drawBar(self, N):
-        progress = (N/self.settings.get_maxtrial('test'))*100
-        bar = widgets.ProgressBar(title='prog_bar', default=0, width=progress,
-                                  box_background_color='white',
-                                  box_border_color='black', box_border_width=2,
-                                  box_margin=(-500, -screen_width/2),
-                                  box_progress_color='green',
-                                  progress_text_enabled=True, progress_text_align='CENTER')
+    # def drawBar(self, N):
+    #     progress = (N/self.settings.get_maxtrial('test'))*100
+    #     bar = widgets.ProgressBar(title='prog_bar', default=0, width=progress,
+    #                               box_background_color='white',
+    #                               box_border_color='black', box_border_width=2,
+    #                               box_margin=(-500, -screen_width/2),
+    #                               box_progress_color='green',
+    #                               progress_text_enabled=True, progress_text_align='CENTER')
         
 
     def show_feedback(self, N, responses_in_block, accs_in_block, RT_all_list):
@@ -1521,15 +1402,21 @@ class Experiment:
         whatnow = self.instructions.feedback_RT_acc(
             rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
 
-    def wait_for_response1(self, expected_response, response_clock):
-        press = event.waitKeys(keyList=self.settings.get_key_list(),
-                               timeStamped=response_clock)
+    # def wait_for_response1(self, expected_response, response_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
+    def wait_for_response1(self, expected_response, response_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
+        press = []
+        while len(press) == 0:
+            press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
+            # self.hit_or_not(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+        print(press)
         if press[0][0] == 'q':
             return (-1, press[0][1])
         return (self.pressed_dict[press[0][0]], press[0][1])
 
+
     def wait_for_response2(self, tStart, k=0, r=0, t=0): # create a while loop and insert eyetracking function
         key_from_serial2 = str(port_s.readline())[2:-1]
+
         # print(key_from_serial2)
         if len(key_from_serial2) > 0:
             key_from_serial2 = key_from_serial2[3]
@@ -1562,6 +1449,7 @@ class Experiment:
         self.print_to_screen("Exiting...\nSaving data...")
         self.person_data.append_to_output_file('userquit')
         core.wait(3)
+        self.EL_disconnect()
         core.quit()
         
     def fixation_cross(self):
@@ -1654,6 +1542,12 @@ class Experiment:
                             lineColor='red', fillColor='red',
                             opacity=.50)
 
+        # eye-tracking relate
+        new_sample = None
+        old_sample = None
+        in_hit_region = False
+        minimum_duration = 0.3
+        gaze_start = -1
 
         stim_RSI = 0.0
         N = self.last_N + 1
@@ -1686,6 +1580,8 @@ class Experiment:
 
         self.trial_phase = "before_stimulus"
         self.last_RSI = -1
+        
+        self.EL_calibration()
 
         # show instructions or continuation message
         if N in self.settings.get_session_starts():
@@ -1717,16 +1613,19 @@ class Experiment:
         else:
             print("Error in getting the eye information!")
             return pylink.TRIAL_ERROR
+                
         
         RSI.start(self.settings.RSI_time)
 
         while True:
-
+            
             stim.draw()
             # fixation_cross.draw()
             outer.draw()
             cross.draw()
             inner.draw()
+
+            self.hit_or_not(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
             self.mywindow.flip()
 
             with self.shared_data_lock:
@@ -1770,7 +1669,8 @@ class Experiment:
 
                 if cycle == 1:
                     trial_clock.reset()
-                (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock)
+                (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+                # (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                 # if meg_session:
                 #     (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
                 
@@ -1919,6 +1819,7 @@ class Experiment:
                 self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur Y pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
                 if self.settings.key_quit in press:
+                    self.EL_abort()
                     core.quit()
 
             # end of session
@@ -1999,7 +1900,7 @@ class Experiment:
             self.EL_init()
             self.open_edf_file()
             self.EL_config()
-            self.EL_calibration()
+            # self.EL_calibration()
             
             if meg_session:
                 # Start the MEG recordings
@@ -2019,8 +1920,8 @@ class Experiment:
             # show ending screen
             self.instructions.show_ending(self)
             
-            # disconnect EyeLink
-            self.EL_disconnect()
+            # # disconnect EyeLink
+            # self.EL_disconnect()
 
             if meg_session:
                 # Stop MEG recordings
