@@ -13,22 +13,24 @@ import numbers
 from datetime import datetime
 from io import StringIO
 import threading
+from multiprocessing import pools
+# import ray
 import os.path as op
 import pandas as pd
 import numpy as np
 from math import atan2, degrees, fabs
-import copy
 
-debug_mode = False
-meg_session = True
-eyetracking = True
-use_retina = True
+debug_mode = True
+meg_session = False
+eyetracking = False
+multiverse = False
+
 
 if debug_mode:
     mouse_visible = True
     full_screen = False
     screen_width = 600
-    screen_height = 500
+    screen_height = 800
 else:
     mouse_visible = False
     full_screen = True
@@ -737,7 +739,7 @@ class Experiment:
         self.fixation_cross = None
 
         self.shared_data_lock = threading.Lock()
-        self.main_loop_lock = threading.Lock()
+        # self.main_loop_lock = threading.Lock()
 
         # visual.Window object for displaying experiment
         self.mywindow = None
@@ -1263,10 +1265,10 @@ class Experiment:
             # Close the link to the tracker.
             self.el_tracker.close()
             
-    def hit_or_not(self, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
-        hit_aoi = False
+    def in_or_out(self, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
+        done = False
         s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
-        while not hit_aoi:
+        while not done:
             # s.play()
             # Do we have a sample in the sample buffer?
             # and does it differ from the one we've seen before?
@@ -1286,7 +1288,7 @@ class Experiment:
                         # break the while loop if the current gaze position is
                         # in a 120 x 120 pixels region around the screen centered
                         fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
-                        if not (fabs(g_x - fix_x) < 60 and fabs(g_y - fix_y) < 60):
+                        if not (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
                             s.play()
                             in_hit_region = False
                             gaze_start = -1
@@ -1301,7 +1303,7 @@ class Experiment:
                                 s.stop()
                                 gaze_dur = core.getTime() - gaze_start
                                 if gaze_dur > minimum_duration:
-                                    hit_aoi = True
+                                    done = True
                         # if fabs(g_x - fix_x) < 60 and fabs(g_y - fix_y) < 60:
                             # record gaze start time
                             # if not in_hit_region:
@@ -1313,7 +1315,7 @@ class Experiment:
                             #     s.stop()
                             #     gaze_dur = core.getTime() - gaze_start
                             #     if gaze_dur > minimum_duration:
-                            #         hit_aoi = True
+                            #         done = True
                         # else:  # gaze outside the hit region, reset variables
                         #     in_hit_region = False
                         #     gaze_start = -1
@@ -1407,7 +1409,16 @@ class Experiment:
         press = []
         while len(press) == 0:
             press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
-            # self.hit_or_not(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+            self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+        print(press)
+        if press[0][0] == 'q':
+            return (-1, press[0][1])
+        return (self.pressed_dict[press[0][0]], press[0][1])
+
+    def wait_for_response3(self, expected_response,  response_clock):
+        press = []
+        while len(press) == 0:
+            press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
         print(press)
         if press[0][0] == 'q':
             return (-1, press[0][1])
@@ -1449,7 +1460,8 @@ class Experiment:
         self.print_to_screen("Exiting...\nSaving data...")
         self.person_data.append_to_output_file('userquit')
         core.wait(3)
-        self.EL_disconnect()
+        if eyetracking:
+            self.EL_disconnect()
         core.quit()
         
     def fixation_cross(self):
@@ -1581,7 +1593,8 @@ class Experiment:
         self.trial_phase = "before_stimulus"
         self.last_RSI = -1
         
-        self.EL_calibration()
+        if eyetracking:
+            self.EL_calibration()
 
         # show instructions or continuation message
         if N in self.settings.get_session_starts():
@@ -1589,31 +1602,31 @@ class Experiment:
             self.instructions.show_instructions(self)
         else:
             self.instructions.show_unexp_quit(self)
-
-        self.el_tracker = pylink.getEYELINK()
-        self.el_tracker.setOfflineMode()
-
-        try:
-            self.el_tracker.startRecording(1, 1, 1, 1)
-        except RuntimeError as error:
-            print("ERROR:", error)
-            return pylink.TRIAL_ERROR
         
-        # Allocate some time for the tracker to cache some samples
-        pylink.pumpDelay(100)
-        
-        # determine which eye(s) is/are available
-        # 0- left, 1-right, 2-binocular
-        eye_used = self.el_tracker.eyeAvailable()
-        if eye_used == 1:
-            self.el_tracker.sendMessage("EYE_USED 1 RIGHT")
-        elif eye_used == 0 or eye_used == 2:
-            self.el_tracker.sendMessage("EYE_USED 0 LEFT")
-            eye_used = 0
-        else:
-            print("Error in getting the eye information!")
-            return pylink.TRIAL_ERROR
-                
+        if eyetracking:
+            self.el_tracker = pylink.getEYELINK()
+            self.el_tracker.setOfflineMode()
+
+            try:
+                self.el_tracker.startRecording(1, 1, 1, 1)
+            except RuntimeError as error:
+                print("ERROR:", error)
+                return pylink.TRIAL_ERROR
+            
+            # Allocate some time for the tracker to cache some samples
+            pylink.pumpDelay(100)
+            
+            # determine which eye(s) is/are available
+            # 0- left, 1-right, 2-binocular
+            eye_used = self.el_tracker.eyeAvailable()
+            if eye_used == 1:
+                self.el_tracker.sendMessage("EYE_USED 1 RIGHT")
+            elif eye_used == 0 or eye_used == 2:
+                self.el_tracker.sendMessage("EYE_USED 0 LEFT")
+                eye_used = 0
+            else:
+                print("Error in getting the eye information!")
+                return pylink.TRIAL_ERROR
         
         RSI.start(self.settings.RSI_time)
 
@@ -1625,7 +1638,8 @@ class Experiment:
             cross.draw()
             inner.draw()
 
-            self.hit_or_not(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+            if eyetracking:
+                self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
             self.mywindow.flip()
 
             with self.shared_data_lock:
@@ -1669,7 +1683,11 @@ class Experiment:
 
                 if cycle == 1:
                     trial_clock.reset()
-                (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+                if eyetracking:
+                    (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+                else:
+                    (response, time_stamp) = self.wait_for_response3(self.stimlist[N], trial_clock)
+
                 # (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                 # if meg_session:
                 #     (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
@@ -1771,7 +1789,8 @@ class Experiment:
                                                                 stimRT, stimACC, response, respKeys, respRT, tresptrig])
 
                 if stimACC == 0:
-                    self.el_tracker.sendMessage('Trial #%d' %N)
+                    if eyetracking:
+                        self.el_tracker.sendMessage('Trial #%d' %N)
                     N += 1
                     first_trial_in_block = False
                     break
@@ -1884,7 +1903,7 @@ class Experiment:
 
         # init window
         self.monitor_settings()
-        with visual.Window(size=(screen_width, screen_height), color='white', fullscr=full_screen,
+        with visual.Window(size=(screen_width, screen_height), color='grey', fullscr=full_screen,
                            monitor=self.mymonitor, units="pix", gammaErrorPolicy=window_gammaErrorPolicy) as self.mywindow:
 
             self.mywindow.mouseVisible = mouse_visible
@@ -1896,11 +1915,11 @@ class Experiment:
             print(str(self.frame_sd))
             print(str(self.frame_rate))
 
-            # initialize EyeLink
-            self.EL_init()
-            self.open_edf_file()
-            self.EL_config()
-            # self.EL_calibration()
+            if eyetracking:
+                # initialize EyeLink
+                self.EL_init()
+                self.open_edf_file()
+                self.EL_config()
             
             if meg_session:
                 # Start the MEG recordings
@@ -1920,8 +1939,9 @@ class Experiment:
             # show ending screen
             self.instructions.show_ending(self)
             
-            # # disconnect EyeLink
-            # self.EL_disconnect()
+            if eyetracking:
+                # disconnect EyeLink
+                self.EL_disconnect()
 
             if meg_session:
                 # Stop MEG recordings

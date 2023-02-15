@@ -1,0 +1,4 @@
+subject_name	subject_number	subject_sex	subject_age	session	block	trial	RSI_time	frame_rate	frame_time	frame_sd	time	date	trial_type	RT	error	stimulus	response	respKeys	respRT	tresptrig	quit_log	
+john-doe	01	male	18	1	0	1	0,0	None	9,837838932774602	1,868758195046962	16:04:03.673981	15/02/2023	training	0,8963069590008672	0	2	2	
+john-doe	01	male	18	1	1	2	2,260882415999731	None	9,837838932774602	1,868758195046962	16:04:06.958078	15/02/2023	random	1,0160329160007677	0	5	5	
+john-doe	01	male	18	1	2	3	0,0	None	9,837838932774602	1,868758195046962	16:04:15.619921	15/02/2023	random	1,1141374590006308	0	1	1	userquit
