@@ -13,7 +13,7 @@ import numbers
 from datetime import datetime
 from io import StringIO
 import threading
-from multiprocessing import pools
+from multiprocessing import Pool, Process
 # import ray
 import os.path as op
 import pandas as pd
@@ -1286,7 +1286,7 @@ class Experiment:
                             g_x, g_y = new_sample.getLeftEye().getGaze()
 
                         # break the while loop if the current gaze position is
-                        # in a 120 x 120 pixels region around the screen centered
+                        # in a 128 x 128 pixels region around the screen centered
                         fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
                         if not (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
                             s.play()
@@ -1304,22 +1304,6 @@ class Experiment:
                                 gaze_dur = core.getTime() - gaze_start
                                 if gaze_dur > minimum_duration:
                                     done = True
-                        # if fabs(g_x - fix_x) < 60 and fabs(g_y - fix_y) < 60:
-                            # record gaze start time
-                            # if not in_hit_region:
-                            #     if gaze_start == -1:
-                            #         gaze_start = core.getTime()
-                            #         in_hit_region = True
-                            # # check the gaze duration and fire
-                            # if in_hit_region:
-                            #     s.stop()
-                            #     gaze_dur = core.getTime() - gaze_start
-                            #     if gaze_dur > minimum_duration:
-                            #         done = True
-                        # else:  # gaze outside the hit region, reset variables
-                        #     in_hit_region = False
-                        #     gaze_start = -1
-
                 # update the "old_sample"
                 old_sample = new_sample
         
@@ -1404,13 +1388,47 @@ class Experiment:
         whatnow = self.instructions.feedback_RT_acc(
             rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
 
-    # def wait_for_response1(self, expected_response, response_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
     def wait_for_response1(self, expected_response, response_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
         press = []
+        done = False
+        s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
         while len(press) == 0:
+            new_sample = self.el_tracker.getNewestSample()
+            if new_sample is not None:
+                if old_sample is not None:
+                    if new_sample.getTime() != old_sample.getTime():
+                        # check if the new sample has data for the eye
+                        # currently being tracked; if so, we retrieve the current
+                        # gaze position and PPD (how many pixels correspond to 1
+                        # deg of visual angle, at the current gaze position)
+                        if eye_used == 1 and new_sample.isRightSample():
+                            g_x, g_y = new_sample.getRightEye().getGaze()
+                        if eye_used == 0 and new_sample.isLeftSample():
+                            g_x, g_y = new_sample.getLeftEye().getGaze()
+
+                        # break the while loop if the current gaze position is
+                        # in a 128 x 128 pixels region around the screen centered
+                        fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
+                        if not (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
+                            s.play()
+                            in_hit_region = False
+                            gaze_start = -1
+                        else:  # gaze outside the hit region, reset variables
+                            # record gaze start time
+                            if not in_hit_region:
+                                if gaze_start == -1:
+                                    gaze_start = core.getTime()
+                                    in_hit_region = True
+                            # check the gaze duration and fire
+                            if in_hit_region:
+                                s.stop()
+                                gaze_dur = core.getTime() - gaze_start
+                                if gaze_dur > minimum_duration:
+                                    done = True
+                # update the "old_sample"
+                old_sample = new_sample
             press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
-            self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
-        print(press)
+            # self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
         if press[0][0] == 'q':
             return (-1, press[0][1])
         return (self.pressed_dict[press[0][0]], press[0][1])
@@ -1929,8 +1947,17 @@ class Experiment:
                 time.sleep(.005)
                 port.setData(0)
 
-            # show experiment screen
-            self.presentation()
+
+            if multiverse:
+                p1 = Process(target=self.presentation, args=())
+                p2 = Process(target=self.in_or_out, args=()) # add arguments here
+                p1.start()
+                p2.start()
+                p1.join()
+                p2.join()
+            else: 
+                # show experiment screen
+                self.presentation()
 
             # save user data
             self.person_data.save_person_settings(self)
