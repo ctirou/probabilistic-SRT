@@ -1,4 +1,4 @@
-from psychopy import visual, core, event, gui, monitors, sound, parallel
+from psychopy import visual, core, event, gui, monitors, sound, parallel, prefs
 import psychtoolbox as ptb
 # import pygame
 # import pygame_menu
@@ -14,15 +14,14 @@ from datetime import datetime
 from io import StringIO
 import threading
 from multiprocessing import Pool, Process
-# import ray
 import os.path as op
 import pandas as pd
 import numpy as np
 from math import atan2, degrees, fabs
 
-debug_mode = True
-meg_session = False
-eyetracking = False
+debug_mode = False
+meg_session = True
+eyetracking = True
 multiverse = False
 
 
@@ -30,7 +29,7 @@ if debug_mode:
     mouse_visible = True
     full_screen = False
     screen_width = 600
-    screen_height = 800
+    screen_height = 700
 else:
     mouse_visible = False
     full_screen = True
@@ -64,7 +63,7 @@ if meg_session:
         addressPortParallel = '0x3FE8'
     except:
         addressPortParallel = '0x3FF8'
-
+    print(addressPortParallel)
     #receive responses
     port_s = serial_port()
     # send triggers
@@ -366,7 +365,7 @@ class ExperimentSettings:
         settings_dialog.addField('Monitor Height (cm)', 28.62)
         settings_dialog.addField('Distance to monitor (cm)', 80)
         settings_dialog.addText('On timings...')
-        settings_dialog.addField('RSI (ms)', 120)
+        settings_dialog.addField('RSI (ms)', 125)
         settings_dialog.addField('Resting time (s)', 7)
 
         returned_data = settings_dialog.show()
@@ -408,13 +407,7 @@ class ExperimentSettings:
             self.speed_warning = returned_data[7]
             self.acc_warning = returned_data[8]
         else:
-            core.quit()
-
-    # def eyetrack_init(self, edfFileName):
-    #     selfEdf = EyeLink.tracker(1920, 1080, edfFileName)
-    #     EyeLink.tracker.sendMessage(selfEdf, 'H')
-    #     EyeLink.tracker.close(selfEdf, edfFileName)
-    
+            core.quit()                
 
 
 class InstructionHelper:
@@ -616,7 +609,7 @@ class PersonDataHandler:
             with codecs.open(self.subject_list_file_path, 'w', encoding='utf-8') as subject_list_file:
                 subject_list_IO = StringIO()
                 # write header
-                subject_list_IO.write('subject_name\tsubject_id\tsubject_sex\tsubject_age\n')
+                subject_list_IO.write('subject_id\tsubject_sex\tsubject_age\n')
 
                 # write subject data
                 for id in all_IDs:
@@ -650,8 +643,7 @@ class PersonDataHandler:
             N = data[0]
             session = experiment.stim_sessionN[N]
 
-            output_data = [experiment.subject_name,
-                           str(experiment.subject_number).zfill(2),
+            output_data = [str(experiment.subject_number).zfill(2),
                            experiment.subject_sex,
                            experiment.subject_age,
 
@@ -687,8 +679,7 @@ class PersonDataHandler:
     def add_heading_to_output(self, output_file):
         """Add the first line to the ouput with the names of the different variables (reaction-time exp. type)."""
 
-        heading_list = ['subject_name',
-                        'subject_number',
+        heading_list = ['subject_number',
                         'subject_sex',
                         'subject_age',
 
@@ -753,8 +744,6 @@ class Experiment:
 
         # serial number of the current subject
         self.subject_number = None
-        # name of the current subject
-        self.subject_name = None
         # sex of the subject (e.g. male, female, other)
         self.subject_sex = None
         # age of the subject (e.g. 23 (years))
@@ -800,17 +789,11 @@ class Experiment:
         while not itsOK:
             settings_dialog = gui.Dlg(title='Settings')
             settings_dialog.addText(warningtext, color='Red')
-            settings_dialog.addField('Name', "John Doe")
             settings_dialog.addField('Participant number', str(1).zfill(2))
 
             returned_data = settings_dialog.show()
             if settings_dialog.OK:
-                name = returned_data[0]
-                name = normalize_string(name, '-')
-                name = name.replace("_", "-")
-                self.subject_name = name
-
-                subject_number = returned_data[1]
+                subject_number = returned_data[0]
                 try:
                     subject_number = int(subject_number)
                     if subject_number >= 0:
@@ -819,7 +802,6 @@ class Experiment:
                     else:
                         warningtext = 'Enter a positive participant number!'
                         continue
-
                 except:
                     warningtext = 'Enter a positive participant number!'
                     continue
@@ -1052,7 +1034,7 @@ class Experiment:
         self.show_subject_identification_dialog()
 
         # unique subject ID
-        subject_id = self.subject_name + '_' + str(self.subject_number).zfill(2)
+        subject_id = str(self.subject_number).zfill(2)
 
         # init subject data handler with the right file paths
         all_settings_file_path = os.path.join(self.workdir_path, "settings", subject_id)
@@ -1060,7 +1042,7 @@ class Experiment:
         sequence_file_path = os.path.join(self.workdir_path, "sequences",
                                           str(self.subject_number) + '_seq' + str(self.settings.current_session) + '.csv')
         subject_list_file_path = os.path.join(self.workdir_path, "settings",
-                                            "participants_in_experiment.txt")
+                                            "participants_in_experiment.csv")
         output_file_path = os.path.join(self.workdir_path, "logs", subject_id + '_log.csv')
         self.person_data = PersonDataHandler(subject_id, all_settings_file_path,
                                             all_IDs_file_path, sequence_file_path, subject_list_file_path,
@@ -1337,12 +1319,12 @@ class Experiment:
         # prog = self.pixel_to_degrees(progress)
         
         bar_outline = visual.Rect(win=self.mywindow, units='pix',
-                            pos=(-500, -screen_width/2),
+                            pos=(-500, -screen_height/2),
                             size=(1000, 20),
                             fillColor=None,
                             lineColor='black', lineWidth=1)
         bar = visual.Rect(win=self.mywindow, units='pix',
-                    pos=(-500, -screen_width/2),
+                    pos=(-500, -screen_height/2),
                     size=(progress, 20),
                     fillColor='blue',
                     lineWidth=0)
@@ -1409,6 +1391,7 @@ class Experiment:
                         # break the while loop if the current gaze position is
                         # in a 128 x 128 pixels region around the screen centered
                         fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
+                        # print("x:", g_x, "y:", g_y)
                         if not (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
                             s.play()
                             in_hit_region = False
@@ -1457,18 +1440,8 @@ class Experiment:
                 print(k)
         return k, r, t
 
-    def send_trigger(self, N):
-        
-        d = {'training': [1, 2, 3, 4, 5],
-             'no transition': [11, 12, 13, 14, 15],
-             'random': [21, 22, 23, 24, 25],
-             'deterministic': [31, 32, 33, 34, 35],
-             'high_prob': [41, 42, 43, 44, 45],
-             'medium_prob': [51, 52, 53, 54, 55],
-             'low_prob': [61, 62, 63, 64, 65]}
-    
-        trigg_value = d[self.stimpr[N]][self.stimlist[N]-1]
-        print(trigg_value)
+    def send_trigger(self, N, trigg_value):    
+        # print(trigg_value)
         
         port.setData(trigg_value)
         time.sleep(.005)
@@ -1527,7 +1500,53 @@ class Experiment:
             cross.draw()
             inner.draw()
             self.mywindow.flip()
-         
+        
+    def close_to_break(self, outer, cross, inner, experiment, 
+                       eye_used, old_sample, new_sample, minimum_duration, gaze_start):
+        closed=False
+        s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
+        
+        while not closed:
+            self.print_to_screen("Fermez vos yeux pour lancer la tâche.")
+            new_sample = self.el_tracker.getNewestSample()
+            if new_sample is not None:
+                if old_sample is not None:
+                    if new_sample.getTime() != old_sample.getTime():
+                        if eye_used == 1 and new_sample.isRightSample():
+                            g_x, g_y = new_sample.getRightEye().getGaze()
+                        if eye_used == 0 and new_sample.isLeftSample():
+                            g_x, g_y = new_sample.getLeftEye().getGaze()
+                        # print("x:", g_x, "y:", g_y)
+                        if not (g_x <= 0 or g_y <= 0):
+                            gaze_start = -1
+                        else:
+                            if gaze_start == -1:
+                                gaze_start = core.getTime()
+                            gaze_dur = core.getTime() - gaze_start
+                            if gaze_dur > minimum_duration:
+                                closed = True
+                old_sample = new_sample
+        
+        rest_time = core.CountdownTimer(self.settings.rest_time)
+        while rest_time.getTime() > 1:
+            outer.draw()
+            cross.draw()
+            inner.draw()
+            self.mywindow.flip()
+        if not debug_mode:
+            s.play()
+        while rest_time.getTime() > 0:
+            outer.draw()
+            cross.draw()
+            inner.draw()
+            self.mywindow.flip()
+    
+    def set_audio(self):
+        prefs.hardware['audioLib'] = 'PTB'
+        # For some reason, we can't set this using the preferences dialog in the GUI so we have to set it here
+        prefs.hardware['audioDevice'] = 'Haut-parleurs (Sound Blaster Audigy 5/Rx)'
+        prefs.hardware['audioLatencyMode'] = 4
+
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
 
@@ -1571,13 +1590,22 @@ class Experiment:
         red = visual.Circle(win=self.mywindow, units='deg', radius=size/2,
                             lineColor='red', fillColor='red',
                             opacity=.50)
+        
+        d = {'training': [1, 2, 3, 4, 5],
+             'no transition': [11, 12, 13, 14, 15],
+             'random': [21, 22, 23, 24, 25],
+             'deterministic': [31, 32, 33, 34, 35],
+             'high_prob': [41, 42, 43, 44, 45],
+             'medium_prob': [51, 52, 53, 54, 55],
+             'low_prob': [61, 62, 63, 64, 65]}
 
-        # eye-tracking relate
-        new_sample = None
-        old_sample = None
-        in_hit_region = False
-        minimum_duration = 0.3
-        gaze_start = -1
+        if not multiverse:
+            # eye-tracking related
+            new_sample = None
+            old_sample = None
+            in_hit_region = False
+            minimum_duration = 0.3
+            gaze_start = -1
 
         stim_RSI = 0.0
         N = self.last_N + 1
@@ -1656,8 +1684,8 @@ class Experiment:
             cross.draw()
             inner.draw()
 
-            if eyetracking:
-                self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+            # if eyetracking:
+            #     self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
             self.mywindow.flip()
 
             with self.shared_data_lock:
@@ -1686,9 +1714,9 @@ class Experiment:
                 outer.draw()
                 cross.draw()
                 inner.draw()
+                trigg_value = d[self.stimpr[N]][self.stimlist[N]-1]
                 self.mywindow.flip()
-                if meg_session and cycle == 0:
-                    self.send_trigger(N)
+                self.send_trigger(N, trigg_value)
                 if cycle == 1: # check next time if 0 or 1
                     if first_trial_in_block:
                         stim_RSI = 0.0
@@ -1701,7 +1729,7 @@ class Experiment:
 
                 if cycle == 1:
                     trial_clock.reset()
-                if eyetracking:
+                if eyetracking and not multiverse:
                     (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                 else:
                     (response, time_stamp) = self.wait_for_response3(self.stimlist[N], trial_clock)
@@ -1739,6 +1767,8 @@ class Experiment:
                     pixel.setAutoDraw(True)
                     stim.draw()
                     self.mywindow.flip()
+                    # if eyetracking and not multiverse:
+                    #     self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                     RSI_clock.reset()
                     RSI.start(self.settings.RSI_time)
                     stimACC = 0
@@ -1821,6 +1851,10 @@ class Experiment:
                     self.trial_phase = "before stimulus"
                     self.last_RSI = - 1
 
+                # if eyetracking:
+                #     self.close_to_break(outer, cross, inner, 
+                #     self.settings, eye_used, old_sample, new_sample, minimum_duration, gaze_start)
+                # else:
                 self.resting_period(outer, cross, inner, self.settings)
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
@@ -1862,7 +1896,7 @@ class Experiment:
             # end of session
             if N == self.end_at[N - 1]:
             # if N == (len(self.stimlist) - 1):
-                self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé(e) !")
+                self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
                 core.wait(10)
                 break
 
@@ -1926,12 +1960,13 @@ class Experiment:
 
             self.mywindow.mouseVisible = mouse_visible
 
+            self.set_audio()
+
             # check frame rate
             self.frame_check()
-            
-            print(str(self.frame_time))
-            print(str(self.frame_sd))
-            print(str(self.frame_rate))
+            print(self.frame_time)
+            print(self.frame_sd)
+            print(self.frame_rate)           
 
             if eyetracking:
                 # initialize EyeLink
@@ -1949,8 +1984,27 @@ class Experiment:
 
 
             if multiverse:
+                
+                new_sample = None
+                old_sample = None
+                in_hit_region = False
+                minimum_duration = 0.3
+                gaze_start = -1
+                
+                # determine which eye(s) is/are available
+                # 0- left, 1-right, 2-binocular
+                eye_used = self.el_tracker.eyeAvailable()
+                if eye_used == 1:
+                    self.el_tracker.sendMessage("EYE_USED 1 RIGHT")
+                elif eye_used == 0 or eye_used == 2:
+                    self.el_tracker.sendMessage("EYE_USED 0 LEFT")
+                    eye_used = 0
+                else:
+                    print("Error in getting the eye information!")
+                    return pylink.TRIAL_ERROR
+
                 p1 = Process(target=self.presentation, args=())
-                p2 = Process(target=self.in_or_out, args=()) # add arguments here
+                p2 = Process(target=self.in_or_out, args=(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start))
                 p1.start()
                 p2.start()
                 p1.join()
