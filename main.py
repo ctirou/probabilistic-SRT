@@ -19,17 +19,18 @@ import pandas as pd
 import numpy as np
 from math import atan2, degrees, fabs
 
-debug_mode = False
-meg_session = True
-eyetracking = True
+debug_mode = True
+meg_session = False
+eyetracking = False
 multiverse = False
-
 
 if debug_mode:
     mouse_visible = True
     full_screen = False
     screen_width = 600
     screen_height = 700
+    resting_time = 1
+    
 else:
     mouse_visible = False
     full_screen = True
@@ -78,11 +79,6 @@ except NameError:
 def ensure_dir(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
-
-def normalize_string(string, blank_char):
-    string = string.lower()
-    string = string.replace(' ', blank_char)
-    return string
 
     
 class ExperimentSettings:
@@ -376,7 +372,10 @@ class ExperimentSettings:
             self.monitor_height = returned_data[2]
             self.monitor_distance = returned_data[3]
             self.RSI_time = float(returned_data[4]) / 1000
-            self.rest_time = float(returned_data[5])
+            if debug_mode:
+                self.rest_time = float(resting_time)
+            else:
+                self.rest_time = float(returned_data[5])
         else:
             core.quit()
 
@@ -487,14 +486,14 @@ class InstructionHelper:
     def show_instructions(self, experiment):
         self.__show_message(self.insts, experiment)
 
-    def show_training_end(self, experiment):
-        self.__show_message(self.training_end, experiment)
+    # def show_training_end(self, experiment):
+    #     self.__show_message(self.training_end, experiment)
 
     def show_unexp_quit(self, experiment):
         self.__show_message(self.unexp_quit, experiment)
 
-    def show_ending(self, experiment):
-        self.__show_message(self.show_ending, experiment)
+    # def show_ending(self, experiment):
+    #     self.__show_message(self.ending, experiment)
 
 
     def feedback_RT_acc(self, rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, mywindow, experiment_settings):
@@ -558,6 +557,7 @@ class PersonDataHandler:
                 experiment.stimlist = this_person_settings['stimlist']
                 experiment.stimpr = this_person_settings['stimpr']
                 experiment.last_N = this_person_settings['last_N']
+                experiment.last_session = this_person_settings['last_session']
                 experiment.end_at = this_person_settings['end_at']
         except:
             experiment.subject_age = None
@@ -568,6 +568,7 @@ class PersonDataHandler:
             experiment.stimlist = []
             experiment.stimpr = []
             experiment.last_N = 0
+            experiment.last_session = 0
             experiment.end_at = {}
 
     def save_person_settings(self, experiment):
@@ -586,6 +587,7 @@ class PersonDataHandler:
             this_person_settings['stimlist'] = experiment.stimlist
             this_person_settings['stimpr'] = experiment.stimpr
             this_person_settings['last_N'] = experiment.last_N
+            this_person_settings['last_session'] = experiment.last_session
             this_person_settings['end_at'] = experiment.end_at
 
     def update_all_subject_attributes_files(self, subject_sex, subject_age):
@@ -765,6 +767,8 @@ class Experiment:
         self.stimpr = None
         # number of the last trial (it is 0 in the beggining and it is always equal with the last displayed stimulus's serial number
         self.last_N = None
+        # number of the last session
+        self.last_session = None
         # this variable has a meaning during presentation, showing the phase of displaying the current stimulus
         # possible values: "before_stimulus", "stimulus_on_screen", "after_reaction"
         self.trial_phase = None
@@ -813,16 +817,18 @@ class Experiment:
            Displays the state of the experiment for the given subject."""
 
         if self.last_N + 1 <= self.settings.get_maxtrial('all'):
+            # if self.last_N + 1 == self.settings.get_maxtrial('trainTest'):
             expstart11 = gui.Dlg(title='Starting task...')
             expstart11.addText("Already have participant's data")
             expstart11.addText('Continue from here...')
             expstart11.addText('Session: ' + str(self.stim_sessionN[self.last_N + 1]))
+            # expstart11.addText('Session: ' + str(self.last_session))
             expstart11.addText('Block: ' + str(self.stimblock[self.last_N + 1]))
             expstart11.show()
             if not expstart11.OK:
                 core.quit()
         else:
-            expstart11 = gui.Dlg(title='Continue from here...')
+            expstart11 = gui.Dlg(title='Continue...')
             expstart11.addText("Already have participant's data")
             expstart11.addText('Participant completed the task.')
             expstart11.show()
@@ -1053,13 +1059,17 @@ class Experiment:
 
         if self.last_N > 0:
             # the current subject already started the experiment
-            self.show_subject_continuation_dialog()
-            self.open_sequence()
+            try:
+                self.show_subject_continuation_dialog()
+                self.open_sequence()
+            except:
+                self.last_N = 0
+                self.open_sequence()
         # we have a new subject
         else:
             # ask about the pattern codes used in the different sessions
             self.show_subject_attributes_dialog()
-            # update participant attribute filesf
+            # update participant attribute files
             self.person_data.update_all_subject_attributes_files(self.subject_sex, self.subject_age)
             # create sequence for current session
             self.open_sequence()
@@ -1269,26 +1279,17 @@ class Experiment:
 
                         # break the while loop if the current gaze position is
                         # in a 128 x 128 pixels region around the screen centered
+                        gaze_start = core.getTime()
                         fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
                         if not (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
-                            s.play()
-                            in_hit_region = False
-                            gaze_start = -1
+                            gaze_dur = core.getTime() - gaze_start
+                            if gaze_dur > minimum_duration:
+                                s.play()
                         else:  # gaze outside the hit region, reset variables
-                            # record gaze start time
-                            if not in_hit_region:
-                                if gaze_start == -1:
-                                    gaze_start = core.getTime()
-                                    in_hit_region = True
-                            # check the gaze duration and fire
-                            if in_hit_region:
-                                s.stop()
-                                gaze_dur = core.getTime() - gaze_start
-                                if gaze_dur > minimum_duration:
-                                    done = True
+                            s.stop()
+                            done = True
                 # update the "old_sample"
                 old_sample = new_sample
-        
 
     def print_to_screen(self, mytext):
         """Display any string on the screen."""
@@ -1351,21 +1352,29 @@ class Experiment:
         rt_mean = float(sum(RT_all_list)) / len(RT_all_list)
         rt_mean_str = str(rt_mean)[:5].replace('.', ',')
         
-        progress = (N/self.settings.get_maxtrial('test'))*1000
+        progress = ((N-self.settings.trials_in_tBlock)/self.settings.get_maxtrial('test'))*1000
+        percent = round((progress/10)/2)
+        text = f"{percent}% completée"
         
         bar_outline = visual.Rect(win=self.mywindow, units='pix',
-                            pos=(-500, -screen_width/2),
-                            size=(1000, 20),
+                            pos=(0, -300),
+                            size=(1004, 45),
                             fillColor=None,
-                            lineColor='black', lineWidth=1)
+                            lineColor='black', lineWidth=3)
         bar = visual.Rect(win=self.mywindow, units='pix',
-                    pos=(-500, -screen_width/2),
-                    size=(progress, 20),
-                    fillColor='blue',
+                    pos=((-500+progress/2), -300),
+                    size=(progress, 40),
+                    fillColor='green',
                     lineWidth=0)
-        
+        completed = visual.TextStim(self.mywindow, text=text,
+                                units="pix", height=50, wrapWidth=20,
+                                anchorHoriz='left',
+                                pos=(550, -300),
+                                color="black")
+    
         bar.draw()
         bar_outline.draw()
+        completed.draw()
         
         whatnow = self.instructions.feedback_RT_acc(
             rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
@@ -1390,24 +1399,15 @@ class Experiment:
 
                         # break the while loop if the current gaze position is
                         # in a 128 x 128 pixels region around the screen centered
+                        gaze_start = core.getTime()
                         fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
-                        # print("x:", g_x, "y:", g_y)
                         if not (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
-                            s.play()
-                            in_hit_region = False
-                            gaze_start = -1
+                            gaze_dur = core.getTime() - gaze_start
+                            if gaze_dur > minimum_duration:
+                                s.play()
                         else:  # gaze outside the hit region, reset variables
-                            # record gaze start time
-                            if not in_hit_region:
-                                if gaze_start == -1:
-                                    gaze_start = core.getTime()
-                                    in_hit_region = True
-                            # check the gaze duration and fire
-                            if in_hit_region:
                                 s.stop()
-                                gaze_dur = core.getTime() - gaze_start
-                                if gaze_dur > minimum_duration:
-                                    done = True
+                                done = True
                 # update the "old_sample"
                 old_sample = new_sample
             press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
@@ -1428,8 +1428,6 @@ class Experiment:
 
     def wait_for_response2(self, tStart, k=0, r=0, t=0): # create a while loop and insert eyetracking function
         key_from_serial2 = str(port_s.readline())[2:-1]
-
-        # print(key_from_serial2)
         if len(key_from_serial2) > 0:
             key_from_serial2 = key_from_serial2[3]
             if ((key_from_serial2 == '1') or (key_from_serial2 == '2')):
@@ -1437,12 +1435,9 @@ class Experiment:
                 r = ptb.GetSecs() - tStart
                 t = ptb.GetSecs()
                 port.setData(50) # response ppt
-                print(k)
         return k, r, t
 
     def send_trigger(self, N, trigg_value):    
-        # print(trigg_value)
-        
         port.setData(trigg_value)
         time.sleep(.005)
         port.setData(0)
@@ -1516,7 +1511,6 @@ class Experiment:
                             g_x, g_y = new_sample.getRightEye().getGaze()
                         if eye_used == 0 and new_sample.isLeftSample():
                             g_x, g_y = new_sample.getLeftEye().getGaze()
-                        # print("x:", g_x, "y:", g_y)
                         if not (g_x <= 0 or g_y <= 0):
                             gaze_start = -1
                         else:
@@ -1597,7 +1591,8 @@ class Experiment:
              'deterministic': [31, 32, 33, 34, 35],
              'high_prob': [41, 42, 43, 44, 45],
              'medium_prob': [51, 52, 53, 54, 55],
-             'low_prob': [61, 62, 63, 64, 65]}
+             'low_prob': [61, 62, 63, 64, 65],
+             'pseudo-random': [71, 72, 73, 74, 75]}
 
         if not multiverse:
             # eye-tracking related
@@ -1716,7 +1711,8 @@ class Experiment:
                 inner.draw()
                 trigg_value = d[self.stimpr[N]][self.stimlist[N]-1]
                 self.mywindow.flip()
-                self.send_trigger(N, trigg_value)
+                if meg_session:
+                    self.send_trigger(N, trigg_value)
                 if cycle == 1: # check next time if 0 or 1
                     if first_trial_in_block:
                         stim_RSI = 0.0
@@ -1886,7 +1882,6 @@ class Experiment:
 
             # end of training
             if N == self.settings.trials_in_tBlock + 1:
-                # self.instructions.show_training_end(self)
                 self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur Y pour lancer la vraie tache !")
                 press = event.waitKeys(keyList=self.settings.get_key_list())
                 if self.settings.key_quit in press:
@@ -1895,8 +1890,10 @@ class Experiment:
 
             # end of session
             if N == self.end_at[N - 1]:
-            # if N == (len(self.stimlist) - 1):
-                self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
+                if self.settings.current_session == self.settings.numsessions:
+                    self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
+                else:
+                    self.print_to_screen("Fin de la première session.\n\nA demain pour la suite !")
                 core.wait(10)
                 break
 
@@ -2018,7 +2015,7 @@ class Experiment:
             self.person_data.append_to_output_file('sessionend_planned_quit')
 
             # show ending screen
-            self.instructions.show_ending(self)
+            # self.instructions.show_ending(self)
             
             if eyetracking:
                 # disconnect EyeLink
