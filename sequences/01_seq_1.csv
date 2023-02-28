@@ -1,0 +1,9 @@
+,trials,trial_keys,trial_type
+0,1,0,to_define
+1,2,4,training
+2,3,2,random
+3,4,1,random
+4,5,4,random
+5,6,5,no transition
+6,7,2,no transition
+7,8,2,no transition

@@ -21,6 +21,7 @@ from math import atan2, degrees, fabs
 debug_mode = False
 meg_session = False
 eyetracking = False
+tutorial = True
 
 if debug_mode:
     mouse_visible = True
@@ -1361,12 +1362,12 @@ class Experiment:
         
         bar_outline = visual.Rect(win=self.mywindow, units='pix',
                             pos=(0, -300),
-                            size=(1004, 45),
+                            size=(1004, 65),
                             fillColor=None,
                             lineColor='black', lineWidth=3)
         bar = visual.Rect(win=self.mywindow, units='pix',
                     pos=((-500+progress/2), -300),
-                    size=(progress, 40),
+                    size=(progress, 60),
                     fillColor='green',
                     lineWidth=0)
         completed = visual.TextStim(self.mywindow, text=text,
@@ -1427,7 +1428,6 @@ class Experiment:
         if press[0][0] == 'q':
             return (-1, press[0][1])
         return (self.pressed_dict[press[0][0]], press[0][1])
-
 
     def wait_for_response2(self, tStart, k=0, r=0, t=0): # create a while loop and insert eyetracking function
         key_from_serial2 = str(port_s.readline())[2:-1]
@@ -1506,23 +1506,32 @@ class Experiment:
         
         while not closed:
             self.print_to_screen("Fermez vos yeux pour lancer la tâche.")
-            new_sample = self.el_tracker.getNewestSample()
-            if new_sample is not None:
-                if old_sample is not None:
-                    if new_sample.getTime() != old_sample.getTime():
-                        if eye_used == 1 and new_sample.isRightSample():
-                            g_x, g_y = new_sample.getRightEye().getGaze()
-                        if eye_used == 0 and new_sample.isLeftSample():
-                            g_x, g_y = new_sample.getLeftEye().getGaze()
-                        if not (g_x <= 0 or g_y <= 0):
-                            gaze_start = -1
-                        else:
-                            if gaze_start == -1:
-                                gaze_start = core.getTime()
-                            gaze_dur = core.getTime() - gaze_start
-                            if gaze_dur > minimum_duration:
-                                closed = True
-                old_sample = new_sample
+            
+            timer = core.CountdownTimer(10)
+            while timer.getTime() > 0:
+                
+                new_sample = self.el_tracker.getNewestSample()
+                if new_sample is not None:
+                    if old_sample is not None:
+                        if new_sample.getTime() != old_sample.getTime():
+                            if eye_used == 1 and new_sample.isRightSample():
+                                g_x, g_y = new_sample.getRightEye().getGaze()
+                            if eye_used == 0 and new_sample.isLeftSample():
+                                g_x, g_y = new_sample.getLeftEye().getGaze()
+                                
+                            
+                            if (g_x >= 1920/2 or g_y >= 1080/2): # option 1
+                            # if (g_x == 0 or g_y == 0): # option 2
+                            # if (g_x == 'Nan' or g_y == 'Nan'): # option 3
+                                gaze_start = -1
+                            else:
+                                if gaze_start == -1:
+                                    gaze_start = core.getTime()
+                                gaze_dur = core.getTime() - gaze_start
+                                if gaze_dur > minimum_duration:
+                                    closed = True
+                                    break
+                    old_sample = new_sample
         
         rest_time = core.CountdownTimer(self.settings.rest_time)
         while rest_time.getTime() > 1:
@@ -1540,7 +1549,6 @@ class Experiment:
     
     def set_audio(self):
         prefs.hardware['audioLib'] = 'PTB'
-        # For some reason, we can't set this using the preferences dialog in the GUI so we have to set it here
         prefs.hardware['audioDevice'] = 'Haut-parleurs (Sound Blaster Audigy 5/Rx)'
         prefs.hardware['audioLatencyMode'] = 4
 
@@ -1554,8 +1562,8 @@ class Experiment:
 
     def super_tutorial(self, stim, size, outer, inner, cross):
         
-        # self.print_to_screen("Vous allez commencez le tutoriel.\nPréparez-vous.")
-        # core.wait(5)
+        self.print_to_screen("Vous allez commencez le tutoriel.\nPréparez-vous.")
+        core.wait(2)
         
         trial_clock = core.Clock()
         
@@ -1569,6 +1577,7 @@ class Experiment:
                                fillColor=None, lineColor='black', lineWidth=3)
         circle_stim = visual.Circle(win=self.mywindow, radius=5, units="cm", fillColor='green')
         
+        self.mywindow.flip()
         n = 0
         while n < self.settings.trials_in_pretrain:
             self.circle_bg(circle_bg, dict_pos)
@@ -1581,13 +1590,12 @@ class Experiment:
             cross.draw()
             inner.draw()
             
-            (response, timer) = self.wait_for_response3(n, trial_clock)
+            response = self.wait_for_response3(n, trial_clock)[0]
             if response == n:
                 n += 1
                 self.mywindow.flip()
         
         self.print_to_screen("Bravo vous avez terminé le tutoriel.")
-
 
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
@@ -1687,7 +1695,8 @@ class Experiment:
         # show instructions or continuation message
         if N in self.settings.get_session_starts():
             self.instructions.show_instructions(self)
-            self.super_tutorial(stim, size, outer, inner, cross)
+            if tutorial:
+                self.super_tutorial(stim, size, outer, inner, cross)
         else:
             self.instructions.show_unexp_quit(self)
         
@@ -1892,11 +1901,10 @@ class Experiment:
                     self.trial_phase = "before stimulus"
                     self.last_RSI = - 1
 
-                # if eyetracking:
-                #     self.close_to_break(outer, cross, inner, 
-                #     self.settings, eye_used, old_sample, new_sample, minimum_duration, gaze_start)
-                # else:
-                self.resting_period(outer, cross, inner, self.settings)
+                if eyetracking:
+                    self.close_to_break(outer, cross, inner, self.settings, eye_used, old_sample, new_sample, minimum_duration, gaze_start)
+                else:
+                    self.resting_period(outer, cross, inner, self.settings)
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
