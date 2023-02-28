@@ -13,16 +13,14 @@ import numbers
 from datetime import datetime
 from io import StringIO
 import threading
-from multiprocessing import Pool, Process
 import os.path as op
 import pandas as pd
 import numpy as np
 from math import atan2, degrees, fabs
 
-debug_mode = True
+debug_mode = False
 meg_session = False
 eyetracking = False
-multiverse = False
 
 if debug_mode:
     mouse_visible = True
@@ -33,7 +31,7 @@ if debug_mode:
     
 else:
     mouse_visible = False
-    full_screen = True
+    full_screen = False
     screen_width = 1920
     screen_height = 1080
 
@@ -978,7 +976,7 @@ class Experiment:
         return seq, stim_type
 
 
-    def calculate_stim_properties(self):
+    def calculate_stim_properties(self, session_num):
         """Calculate all variables used during the trials before the presentation starts."""
 
         (self.stimlist, self.stimpr) = self.open_sequence()
@@ -987,11 +985,15 @@ class Experiment:
         block_num = 0
 
         sessionsstarts = self.settings.get_session_starts()
+        # for trial_num in range(1, self.settings.get_maxtrial('trainTest') + 1):
+        #     for session_num in range(1, len(sessionsstarts)+1):
+        #         if trial_num >= sessionsstarts[session_num - 1] and trial_num < sessionsstarts[session_num]:
+        #             self.stim_sessionN[trial_num] = session_num
+        #             self.end_at[trial_num] = sessionsstarts[session_num]
+        
         for trial_num in range(1, self.settings.get_maxtrial('trainTest') + 1):
-            for session_num in range(1, len(sessionsstarts)):
-                if trial_num >= sessionsstarts[session_num - 1] and trial_num < sessionsstarts[session_num]:
-                    self.stim_sessionN[trial_num] = session_num
-                    self.end_at[trial_num] = sessionsstarts[session_num]
+            self.stim_sessionN[trial_num] = session_num
+            self.end_at[trial_num] = sessionsstarts[1]
         
         current_trial_num = 0
         
@@ -1065,6 +1067,7 @@ class Experiment:
             except:
                 self.last_N = 0
                 self.open_sequence()
+            self.calculate_stim_properties(self.settings.current_session)
         # we have a new subject
         else:
             # ask about the pattern codes used in the different sessions
@@ -1074,7 +1077,7 @@ class Experiment:
             # create sequence for current session
             self.open_sequence()
             # calculate stimulus properties for the experiment
-            self.calculate_stim_properties()
+            self.calculate_stim_properties(self.settings.current_session)
             # save data of the new subject
             self.person_data.save_person_settings(self)
 
@@ -1353,8 +1356,8 @@ class Experiment:
         rt_mean_str = str(rt_mean)[:5].replace('.', ',')
         
         progress = ((N-self.settings.trials_in_tBlock)/self.settings.get_maxtrial('test'))*1000
-        percent = round((progress/10)/2)
-        text = f"{percent}% completée"
+        percent = round((progress/10))
+        text = f"{percent}%"
         
         bar_outline = visual.Rect(win=self.mywindow, units='pix',
                             pos=(0, -300),
@@ -1369,7 +1372,7 @@ class Experiment:
         completed = visual.TextStim(self.mywindow, text=text,
                                 units="pix", height=50, wrapWidth=20,
                                 anchorHoriz='left',
-                                pos=(550, -300),
+                                pos=(0, -300),
                                 color="black")
     
         bar.draw()
@@ -1541,6 +1544,51 @@ class Experiment:
         prefs.hardware['audioDevice'] = 'Haut-parleurs (Sound Blaster Audigy 5/Rx)'
         prefs.hardware['audioLatencyMode'] = 4
 
+    def circle_bg(self, stimbg, dict_pos):
+        """Draw empty stimulus circles."""
+
+        for i in range(1, 6):
+            stimbg.pos = dict_pos[i]
+            stimbg.draw()
+
+
+    def super_tutorial(self, stim, size, outer, inner, cross):
+        
+        # self.print_to_screen("Vous allez commencez le tutoriel.\nPréparez-vous.")
+        # core.wait(5)
+        
+        trial_clock = core.Clock()
+        
+        dict_pos = {1: (-200, -250),
+                    2: (-100, -250),
+                    3: (100, -250),
+                    4: (200, -250),
+                    5: (-300, -300)}
+
+        circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm",
+                               fillColor=None, lineColor='black', lineWidth=3)
+        circle_stim = visual.Circle(win=self.mywindow, radius=5, units="cm", fillColor='green')
+        
+        n = 0
+        while n < self.settings.trials_in_pretrain:
+            self.circle_bg(circle_bg, dict_pos)
+            stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[n+1]],
+                pos=(0,0), units='deg', size=(size, size), opacity=1)
+            circle_stim.setPos(dict_pos[n+1])
+            stim.draw()
+            circle_stim.draw()
+            outer.draw()
+            cross.draw()
+            inner.draw()
+            
+            (response, timer) = self.wait_for_response3(n, trial_clock)
+            if response == n:
+                n += 1
+                self.mywindow.flip()
+        
+        self.print_to_screen("Bravo vous avez terminé le tutoriel.")
+
+
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
 
@@ -1548,7 +1596,7 @@ class Experiment:
 
         # stimulus init
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[1]],
-                                pos=(0,0), units='deg', size=(size, size), opacity=0) # try setting the opacity to 0 if any issue in continuation
+                                pos=(0,0), units='deg', size=(size, size), opacity=0)
 
 
         # fixation cross init
@@ -1594,13 +1642,12 @@ class Experiment:
              'low_prob': [61, 62, 63, 64, 65],
              'pseudo-random': [71, 72, 73, 74, 75]}
 
-        if not multiverse:
-            # eye-tracking related
-            new_sample = None
-            old_sample = None
-            in_hit_region = False
-            minimum_duration = 0.3
-            gaze_start = -1
+        # eye-tracking related
+        new_sample = None
+        old_sample = None
+        in_hit_region = False
+        minimum_duration = 0.3
+        gaze_start = -1
 
         stim_RSI = 0.0
         N = self.last_N + 1
@@ -1639,8 +1686,8 @@ class Experiment:
 
         # show instructions or continuation message
         if N in self.settings.get_session_starts():
-        # if N == 0:
             self.instructions.show_instructions(self)
+            self.super_tutorial(stim, size, outer, inner, cross)
         else:
             self.instructions.show_unexp_quit(self)
         
@@ -1725,7 +1772,7 @@ class Experiment:
 
                 if cycle == 1:
                     trial_clock.reset()
-                if eyetracking and not multiverse:
+                if eyetracking:
                     (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                 else:
                     (response, time_stamp) = self.wait_for_response3(self.stimlist[N], trial_clock)
@@ -1763,8 +1810,6 @@ class Experiment:
                     pixel.setAutoDraw(True)
                     stim.draw()
                     self.mywindow.flip()
-                    # if eyetracking and not multiverse:
-                    #     self.in_or_out(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                     RSI_clock.reset()
                     RSI.start(self.settings.RSI_time)
                     stimACC = 0
@@ -1839,7 +1884,7 @@ class Experiment:
                     first_trial_in_block = False
                     break
 
-            # resting period only   
+            # resting period only
             if N in self.settings.get_block_starts() and N not in self.settings.get_fb_block():
 
                 with self.shared_data_lock:
@@ -1980,35 +2025,8 @@ class Experiment:
                 port.setData(0)
 
 
-            if multiverse:
-                
-                new_sample = None
-                old_sample = None
-                in_hit_region = False
-                minimum_duration = 0.3
-                gaze_start = -1
-                
-                # determine which eye(s) is/are available
-                # 0- left, 1-right, 2-binocular
-                eye_used = self.el_tracker.eyeAvailable()
-                if eye_used == 1:
-                    self.el_tracker.sendMessage("EYE_USED 1 RIGHT")
-                elif eye_used == 0 or eye_used == 2:
-                    self.el_tracker.sendMessage("EYE_USED 0 LEFT")
-                    eye_used = 0
-                else:
-                    print("Error in getting the eye information!")
-                    return pylink.TRIAL_ERROR
-
-                p1 = Process(target=self.presentation, args=())
-                p2 = Process(target=self.in_or_out, args=(eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start))
-                p1.start()
-                p2.start()
-                p1.join()
-                p2.join()
-            else: 
-                # show experiment screen
-                self.presentation()
+            # show experiment screen
+            self.presentation()
 
             # save user data
             self.person_data.save_person_settings(self)
