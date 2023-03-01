@@ -21,7 +21,7 @@ from math import atan2, degrees, fabs
 debug_mode = False
 meg_session = False
 eyetracking = False
-tutorial = True
+tutorial = False
 
 if debug_mode:
     mouse_visible = True
@@ -32,7 +32,7 @@ if debug_mode:
     
 else:
     mouse_visible = False
-    full_screen = False
+    full_screen = True
     screen_width = 1920
     screen_height = 1080
 
@@ -1156,7 +1156,7 @@ class Experiment:
         # if eyelink_ver > 2:
         #     self.el_tracker.sendCommand("sample_rate 1000")
         # Choose a calibration type, H3, HV3, HV5, HV13 (HV = horizontal/vertical),
-        self.el_tracker.sendCommand("calibration_type = HV3")
+        self.el_tracker.sendCommand("calibration_type = HV9")
         # Set a gamepad button to accept calibration/drift check target
         # You need a supported gamepad/button box that is connected to the Host PC
         self.el_tracker.sendCommand("button_function 5 'accept_target_fixation'")
@@ -1372,7 +1372,7 @@ class Experiment:
                     lineWidth=0)
         completed = visual.TextStim(self.mywindow, text=text,
                                 units="pix", height=50, wrapWidth=20,
-                                anchorHoriz='left',
+                                anchorHoriz='center',
                                 pos=(0, -300),
                                 color="black")
     
@@ -1384,8 +1384,9 @@ class Experiment:
             rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
 
     def wait_for_response1(self, expected_response, response_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
+        """ for eyetracker """
         press = []
-        done = False
+        in_hit_region = None
         s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
         while len(press) == 0:
             new_sample = self.el_tracker.getNewestSample()
@@ -1400,18 +1401,25 @@ class Experiment:
                             g_x, g_y = new_sample.getRightEye().getGaze()
                         if eye_used == 0 and new_sample.isLeftSample():
                             g_x, g_y = new_sample.getLeftEye().getGaze()
-
                         # break the while loop if the current gaze position is
                         # in a 128 x 128 pixels region around the screen centered
-                        gaze_start = core.getTime()
                         fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
                         if not (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
-                            gaze_dur = core.getTime() - gaze_start
-                            if gaze_dur > minimum_duration:
-                                s.play()
-                        else:  # gaze outside the hit region, reset variables
-                                s.stop()
-                                done = True
+                            # gaze_start = core.getTime()
+                            # gaze_dur = core.getTime() - gaze_start
+                            # if gaze_dur > minimum_duration:
+                            if in_hit_region:
+                                if gaze_start == -1:
+                                    gaze_start = core.getTime()
+                                    in_hit_region = False
+                            if not in_hit_region:
+                                gaze_dur = core.getTime() - gaze_start
+                                if gaze_dur > minimum_duration:
+                                    s.play()
+                        else:
+                            s.stop()
+                            in_hit_region = True
+                            gaze_start = -1
                 # update the "old_sample"
                 old_sample = new_sample
             press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
@@ -1421,6 +1429,7 @@ class Experiment:
         return (self.pressed_dict[press[0][0]], press[0][1])
 
     def wait_for_response3(self, expected_response,  response_clock):
+        """ without eyetracking """
         press = []
         while len(press) == 0:
             press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
@@ -1430,6 +1439,7 @@ class Experiment:
         return (self.pressed_dict[press[0][0]], press[0][1])
 
     def wait_for_response2(self, tStart, k=0, r=0, t=0): # create a while loop and insert eyetracking function
+        """ with response box"""
         key_from_serial2 = str(port_s.readline())[2:-1]
         if len(key_from_serial2) > 0:
             key_from_serial2 = key_from_serial2[3]
@@ -1501,37 +1511,42 @@ class Experiment:
         
     def close_to_break(self, outer, cross, inner, experiment, 
                        eye_used, old_sample, new_sample, minimum_duration, gaze_start):
-        closed=False
+        closed = False
         s = sound.Sound('A', secs=.5, stereo=True, hamming=True, volume=1.0)
+        in_hit_region = None
         
         while not closed:
             self.print_to_screen("Fermez vos yeux pour lancer la tâche.")
             
-            timer = core.CountdownTimer(10)
-            while timer.getTime() > 0:
-                
-                new_sample = self.el_tracker.getNewestSample()
-                if new_sample is not None:
-                    if old_sample is not None:
-                        if new_sample.getTime() != old_sample.getTime():
-                            if eye_used == 1 and new_sample.isRightSample():
-                                g_x, g_y = new_sample.getRightEye().getGaze()
-                            if eye_used == 0 and new_sample.isLeftSample():
-                                g_x, g_y = new_sample.getLeftEye().getGaze()
-                                
-                            
-                            if (g_x >= 1920/2 or g_y >= 1080/2): # option 1
-                            # if (g_x == 0 or g_y == 0): # option 2
-                            # if (g_x == 'Nan' or g_y == 'Nan'): # option 3
-                                gaze_start = -1
-                            else:
+            # timer = core.CountdownTimer(10)
+            # while timer.getTime() > 0:
+    
+            new_sample = self.el_tracker.getNewestSample()
+            if new_sample is not None:
+                if old_sample is not None:
+                    if new_sample.getTime() != old_sample.getTime():
+                        if eye_used == 1 and new_sample.isRightSample():
+                            g_x, g_y = new_sample.getRightEye().getGaze()
+                        if eye_used == 0 and new_sample.isLeftSample():
+                            g_x, g_y = new_sample.getLeftEye().getGaze()
+                        print('x:', g_x, 'y:', g_y)
+                        # fix_x, fix_y = (screen_width/2.0, screen_height/2.0)
+                        # if (fabs(g_x - fix_x) < 64 and fabs(g_y - fix_y) < 64):
+                        if (g_x == -32768.0 or g_y == -32768.0):
+                            if not in_hit_region:
                                 if gaze_start == -1:
                                     gaze_start = core.getTime()
+                                    in_hit_region = True
+                            # check the gaze duration and fire
+                            if in_hit_region:
                                 gaze_dur = core.getTime() - gaze_start
                                 if gaze_dur > minimum_duration:
                                     closed = True
-                                    break
-                    old_sample = new_sample
+                                    # break
+                            else:
+                                in_hit_region = False
+                                gaze_start = -1
+                old_sample = new_sample
         
         rest_time = core.CountdownTimer(self.settings.rest_time)
         while rest_time.getTime() > 1:
@@ -1563,7 +1578,7 @@ class Experiment:
     def super_tutorial(self, stim, size, outer, inner, cross):
         
         self.print_to_screen("Vous allez commencez le tutoriel.\nPréparez-vous.")
-        core.wait(2)
+        core.wait(1)
         
         trial_clock = core.Clock()
         
@@ -1654,7 +1669,7 @@ class Experiment:
         new_sample = None
         old_sample = None
         in_hit_region = False
-        minimum_duration = 0.3
+        minimum_duration = .6
         gaze_start = -1
 
         stim_RSI = 0.0
@@ -1903,6 +1918,7 @@ class Experiment:
 
                 if eyetracking:
                     self.close_to_break(outer, cross, inner, self.settings, eye_used, old_sample, new_sample, minimum_duration, gaze_start)
+                    core.wait(2)
                 else:
                     self.resting_period(outer, cross, inner, self.settings)
                 self.person_data.flush_data_to_output(self)
@@ -1918,15 +1934,21 @@ class Experiment:
                     self.trial_phase = "before stimulus"
                     self.last_RSI = - 1
 
-                self.resting_period(outer, cross, inner, self.settings)
+                if eyetracking:
+                    self.close_to_break(outer, cross, inner, self.settings, eye_used, old_sample, new_sample, minimum_duration, gaze_start)
+                else:
+                    self.resting_period(outer, cross, inner, self.settings)
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
                 timer = core.CountdownTimer(self.settings.rest_time+3)
                 while timer.getTime() > 0:
-                    # self.prog_bar(N)
-                    # self.drawBar(N)
                     self.show_feedback(N, responses_in_block, accs_in_block, RT_all_list)
+                outer.draw()
+                cross.draw()
+                inner.draw()
+                self.mywindow.flip()
+                core.wait(2)
 
                 responses_in_block = 0
                 RT_all_list = []
