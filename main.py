@@ -21,7 +21,7 @@ from math import atan2, degrees, fabs
 debug_mode = False
 meg_session = False
 eyetracking = False
-tutorial = False
+tutorial = True
 
 if debug_mode:
     mouse_visible = True
@@ -1592,13 +1592,14 @@ class Experiment:
                                fillColor=None, lineColor='black', lineWidth=3)
         circle_stim = visual.Circle(win=self.mywindow, radius=5, units="cm", fillColor='green')
         
-        self.mywindow.flip()
-        n = 0
-        while n < self.settings.trials_in_pretrain:
+        n = 1
+        while n < self.settings.trials_in_pretrain+1:
+            self.mywindow.flip()
+            # while True:
             self.circle_bg(circle_bg, dict_pos)
-            stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[n+1]],
+            stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
                 pos=(0,0), units='deg', size=(size, size), opacity=1)
-            circle_stim.setPos(dict_pos[n+1])
+            circle_stim.setPos(dict_pos[n])
             stim.draw()
             circle_stim.draw()
             outer.draw()
@@ -1608,9 +1609,13 @@ class Experiment:
             response = self.wait_for_response3(n, trial_clock)[0]
             if response == n:
                 n += 1
-                self.mywindow.flip()
+                stim.setOpacity(0)
+                # self.mywindow.flip()
+                    # break
         
+        self.mywindow.flip()
         self.print_to_screen("Bravo vous avez terminé le tutoriel.")
+        core.wait(1)
 
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
@@ -1644,7 +1649,7 @@ class Experiment:
         # Photodiode configuration
         pixel = visual.Rect(win=self.mywindow, units='pix',
                             pos=(0, screen_height/2),
-                            size=(screen_width, 200),
+                            size=(screen_width, 100),
                             fillColor='black', lineColor='black')
         pixel.setAutoDraw(True) # set to True/False to activate/deactivate
 
@@ -1801,7 +1806,6 @@ class Experiment:
                 else:
                     (response, time_stamp) = self.wait_for_response3(self.stimlist[N], trial_clock)
 
-                # (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                 # if meg_session:
                 #     (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
                 
@@ -1826,7 +1830,7 @@ class Experiment:
                 elif response == self.stimlist[N]:
                 # elif str(respKeys) == str(self.stimlist[N]):
                     if meg_session:
-                        port.setData(202)
+                        port.setData(202) # trigger if good response
                         time.sleep(.005)
                         port.setData(0)
                     # start of the RSI timer and offset of the stimulus
@@ -1864,7 +1868,7 @@ class Experiment:
                 # wrong response --> let's wait for the next response
                 else:
                     if meg_session:
-                        port.setData(404)
+                        port.setData(404) # trigger if bad response
                         time.sleep(.005)
                         port.setData(0)
                     stimACC = 1
@@ -1969,7 +1973,7 @@ class Experiment:
                     self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
                 else:
                     self.print_to_screen("Fin de la première session.\n\nA demain pour la suite !")
-                core.wait(10)
+                core.wait(20)
                 break
 
     def run(self, full_screen=full_screen, mouse_visible=mouse_visible, window_gammaErrorPolicy='raise',
@@ -2075,7 +2079,6 @@ class Experiment:
                 port.setData(253)
                 time.sleep(.005)
                 port.setData(0)
-
 
 if __name__ == "__main__":
     thispath = os.path.split(os.path.abspath(__file__))[0]
