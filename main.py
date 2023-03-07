@@ -21,7 +21,7 @@ from math import atan2, degrees, fabs
 debug_mode = False
 meg_session = False
 eyetracking = False
-tutorial = True
+tutorial = False
 
 if debug_mode:
     mouse_visible = True
@@ -1486,6 +1486,8 @@ class Experiment:
         """Resting time with eyes closed."""
 
         self.print_to_screen("Fermez vos yeux.")
+        if not meg_session:
+            core.wait(2)
         # wait for closing of eyes with eye-tracker
         # tempkey = event.waitKeys(keyList=experiment.get_key_list())
 
@@ -1567,19 +1569,37 @@ class Experiment:
         prefs.hardware['audioDevice'] = 'Haut-parleurs (Sound Blaster Audigy 5/Rx)'
         prefs.hardware['audioLatencyMode'] = 4
 
-    def circle_bg(self, stimbg, dict_pos):
+    def circle_bg(self, dict_pos):
         """Draw empty stimulus circles."""
 
-        for i in range(1, 6):
-            stimbg.pos = dict_pos[i]
-            stimbg.draw()
+        one = circle_bg = visual.Circle(win=self.mywindow, radius=20, units="cm", 
+                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[1])
+        two = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
+                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[2])
+        three = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
+                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[3])
+        four = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
+                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[4])
+        five = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
+                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[5])
+
+        one.draw()
+        two.draw()
+        three.draw()
+        four.draw()
+        five.draw()
+
+        # for i in range(1, 6):
+        #     stimbg.pos = dict_pos[i]
+        #     stimbg.draw()
+        #     self.print_to_screen(str(i))
 
 
-    def super_tutorial(self, stim, size, outer, inner, cross):
+    def super_tutorial(self, size, outer, inner, cross):
         
-        self.print_to_screen("Vous allez commencez le tutoriel.\nPréparez-vous.")
-        core.wait(1)
-        
+        self.print_to_screen("Vous allez commencez le tutoriel.\n\nPréparez-vous.")
+        core.wait(2)
+                
         trial_clock = core.Clock()
         
         dict_pos = {1: (-200, -250),
@@ -1587,35 +1607,47 @@ class Experiment:
                     3: (100, -250),
                     4: (200, -250),
                     5: (-300, -300)}
-
-        circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm",
-                               fillColor=None, lineColor='black', lineWidth=3)
-        circle_stim = visual.Circle(win=self.mywindow, radius=5, units="cm", fillColor='green')
-        
+                
         n = 1
-        while n < self.settings.trials_in_pretrain+1:
-            self.mywindow.flip()
-            # while True:
-            self.circle_bg(circle_bg, dict_pos)
-            stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
-                pos=(0,0), units='deg', size=(size, size), opacity=1)
-            circle_stim.setPos(dict_pos[n])
+        stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
+            pos=(0,0), units='deg', size=(size, size), opacity=0)
+        # circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm",
+        #                        fillColor=None, lineColor='black', lineWidth=3)
+        circle_stim = visual.Circle(win=self.mywindow, radius=5, units="cm", fillColor='green')
+                        
+        while True:
             stim.draw()
-            circle_stim.draw()
             outer.draw()
             cross.draw()
             inner.draw()
+            self.circle_bg(dict_pos)
+            self.mywindow.flip()
+
+            while True:
+                stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
+                    pos=(0,0), units='deg', size=(size, size), opacity=1)
+                stim.draw()
+                circle_stim.draw()
+                outer.draw()
+                cross.draw()
+                inner.draw()
+                self.circle_bg(dict_pos)
+                circle_stim.setPos(dict_pos[n])
+                self.mywindow.flip()
+                
+                response = self.wait_for_response3(n, trial_clock)[0]
+                if response == n:
+                    stim.setOpacity(0)
+                    self.mywindow.flip()
+                    n += 1
+                    break
             
-            response = self.wait_for_response3(n, trial_clock)[0]
-            if response == n:
-                n += 1
-                stim.setOpacity(0)
-                # self.mywindow.flip()
-                    # break
+            if n == self.settings.trials_in_pretrain+1:
+                break
         
         self.mywindow.flip()
-        self.print_to_screen("Bravo vous avez terminé le tutoriel.")
-        core.wait(1)
+        self.print_to_screen("Bravo vous avez terminé le tutoriel.\n\n L'entraînement va se lancer. Préparez-vous.")
+        core.wait(2)
 
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
@@ -1661,6 +1693,7 @@ class Experiment:
                             lineColor='red', fillColor='red',
                             opacity=.50)
         
+        # trigger codes
         d = {'training': [1, 2, 3, 4, 5],
              'no transition': [11, 12, 13, 14, 15],
              'random': [21, 22, 23, 24, 25],
@@ -1716,7 +1749,7 @@ class Experiment:
         if N in self.settings.get_session_starts():
             self.instructions.show_instructions(self)
             if tutorial:
-                self.super_tutorial(stim, size, outer, inner, cross)
+                self.super_tutorial(size, outer, inner, cross)
         else:
             self.instructions.show_unexp_quit(self)
         
