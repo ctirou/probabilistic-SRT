@@ -2,7 +2,7 @@ inst#
 
 Bienvenue!
 
-Sur l'écran, vous verrez quatre images apparaître une à la fois.
+Sur l'écran, vous verrez cinq images apparaître une à la fois.
 
 Votre tâche consiste à appuyer sur la touche correspondant à l'image qui vient d'apparaître.
 
