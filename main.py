@@ -327,7 +327,7 @@ class ExperimentSettings:
         settings_dialog = gui.Dlg(title='Experiment design')
         settings_dialog.addText('No settings saved for this experiment yet...')
         settings_dialog.addField('Current session:', choices=['1st', '2nd'])
-        settings_dialog.addField('Blocks per session', 140)
+        settings_dialog.addField('Blocks per session', 120)
         settings_dialog.addField('Trials in pre-training', 5)
         settings_dialog.addField('Trials in training block', 40)
         settings_dialog.addField('Trials per testing block', 20)
