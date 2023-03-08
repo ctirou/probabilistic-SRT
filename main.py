@@ -21,7 +21,7 @@ from math import atan2, degrees, fabs
 debug_mode = False
 meg_session = False
 eyetracking = False
-tutorial = False
+tutorial = True
 
 if debug_mode:
     mouse_visible = True
@@ -864,7 +864,7 @@ class Experiment:
     def create_sequence(self):
         """Generates csv file with list of stimuli for current session."""
 
-        keys = [1, 2, 3, 4, 5]
+        keys = [1, 2, 3, 4, 5] # permuter
         trials = np.arange(1, self.settings.get_maxtrial('trainTest') + 2)
         half = self.settings.get_maxtrial('test')/2
         data = pd.DataFrame({'trials': trials,
