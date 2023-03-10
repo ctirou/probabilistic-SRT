@@ -18,21 +18,22 @@ import pandas as pd
 import numpy as np
 from math import atan2, degrees, fabs
 
-debug_mode = False
+debug_mode = True
 meg_session = False
 eyetracking = False
-tutorial = True
+tutorial = False
+resting_state = False
 
 if debug_mode:
     mouse_visible = True
     full_screen = False
-    screen_width = 600
-    screen_height = 700
+    screen_width = 1920
+    screen_height = 1080
     resting_time = 1
     
 else:
     mouse_visible = False
-    full_screen = True
+    full_screen = False
     screen_width = 1920
     screen_height = 1080
 
@@ -103,12 +104,14 @@ class ExperimentSettings:
 
         self.RSI_time = None # response-to-next-stimulus in milliseconds
         self.rest_time = None # resting period duration in seconds
+        self.rs_time = None # resting state time in seconds
 
         self.key1 = None
         self.key2 = None
         self.key3 = None
         self.key4 = None
         self.key5 = None
+        self.key_resume = 'c'
         self.key_quit = None
 
         self.whether_warning = None
@@ -156,12 +159,14 @@ class ExperimentSettings:
 
                 self.RSI_time = settings_file['RSI_time']
                 self.rest_time = settings_file['rest_time']
+                self.rs_time = settings_file['rs_time']
 
                 self.key1 = settings_file['key1']
                 self.key2 = settings_file['key2']
                 self.key3 = settings_file['key3']
                 self.key4 = settings_file['key4']
                 self.key5 = settings_file['key5']
+                self.key_resume = settings_file['key_resume']
                 self.key_quit = settings_file['key_quit']
 
                 self.whether_warning = settings_file['whether_warning']
@@ -195,12 +200,14 @@ class ExperimentSettings:
 
             settings_file['RSI_time'] = self.RSI_time
             settings_file['rest_time'] = self.rest_time
+            settings_file['rs_time'] = self.rs_time
 
             settings_file['key1'] = self.key1
             settings_file['key2'] = self.key2
             settings_file['key3'] = self.key3
             settings_file['key4'] = self.key4
             settings_file['key5'] = self.key5
+            settings_file['key_resume'] = self.key_resume
             settings_file['key_quit'] = self.key_quit
 
             settings_file['whether_warning'] = self.whether_warning
@@ -225,6 +232,7 @@ class ExperimentSettings:
                            'Distance to monitor: ' + '\t' + str(self.monitor_distance).replace('.', ',') + '\n')
 
             reminder += str('Response keys: ' + '\t' + self.key1 + ', ' + self.key2 + ', ' + self.key3 + ', ' + self.key4 + ',' + self.key5 + '.' + '\n' +
+                            'Resume key: ' + '\t' + self.key_resume + '\n' +
                             'Quit key: ' + '\t' + self.key_quit + '\n' +
                             'Warning (speed, accuracy): ' + '\t' + str(self.whether_warning) + '\n' +
                             'Speed warning at:' + '\t' + str(self.speed_warning) + '\n' +
@@ -235,7 +243,8 @@ class ExperimentSettings:
                             'Training Trials\\Block:' + '\t' + str(self.trials_in_tBlock) + '\n' +
                             'Trials\\Block:' + '\t' + str(self.trials_in_block) + '\n' +
                             'RSI:' + '\t' + str(self.RSI_time).replace('.', ',') + '\n'
-                            'Resting time: ' + '\t' + str(self.rest_time).replace('.', ',') + '\n')
+                            'Resting time: ' + '\t' + str(self.rest_time).replace('.', ',') + '\n' +
+                            'Resting state time:' + '\t' + str(self.rs_time).replace('.', ',') + '\n')
             
             if eyetracking:
                 reminder += str('AOI size:' + '\t' + str(self.AOI_size).replace('.', ',') + '\n' +
@@ -328,7 +337,7 @@ class ExperimentSettings:
         settings_dialog.addText('No settings saved for this experiment yet...')
         settings_dialog.addField('Current session:', choices=['1st', '2nd'])
         settings_dialog.addField('Blocks per session', 120)
-        settings_dialog.addField('Trials in pre-training', 5)
+        settings_dialog.addField('Trials in pre-training', 25)
         settings_dialog.addField('Trials in training block', 40)
         settings_dialog.addField('Trials per testing block', 20)
         returned_data = settings_dialog.show()
@@ -361,7 +370,8 @@ class ExperimentSettings:
         settings_dialog.addField('Distance to monitor (cm)', 80)
         settings_dialog.addText('On timings...')
         settings_dialog.addField('RSI (ms)', 125)
-        settings_dialog.addField('Resting time (s)', 7)
+        settings_dialog.addField('Resting time (s)', 5)
+        settings_dialog.addField('Resting state time (s)', 240)
 
         returned_data = settings_dialog.show()
 
@@ -371,10 +381,12 @@ class ExperimentSettings:
             self.monitor_height = returned_data[2]
             self.monitor_distance = returned_data[3]
             self.RSI_time = float(returned_data[4]) / 1000
+            self.rs_time = float(returned_data[6])
             if debug_mode:
                 self.rest_time = float(resting_time)
             else:
                 self.rest_time = float(returned_data[5])
+                
         else:
             core.quit()
 
@@ -552,7 +564,8 @@ class PersonDataHandler:
                 experiment.stim_sessionN = this_person_settings['stim_sessionN']
                 experiment.stimblock = this_person_settings['stimblock']
                 experiment.stimtrial = this_person_settings['stimtrial']
-
+                
+                experiment.unique_seq = this_person_settings['unique_seq']
                 experiment.stimlist = this_person_settings['stimlist']
                 experiment.stimpr = this_person_settings['stimpr']
                 experiment.last_N = this_person_settings['last_N']
@@ -564,6 +577,7 @@ class PersonDataHandler:
             experiment.stim_sessionN = {}
             experiment.stimblock = {}
             experiment.stimtrial = {}
+            experiment.unique_seq = None
             experiment.stimlist = []
             experiment.stimpr = []
             experiment.last_N = 0
@@ -583,6 +597,7 @@ class PersonDataHandler:
             this_person_settings['stimblock'] = experiment.stimblock
             this_person_settings['stimtrial'] = experiment.stimtrial
 
+            this_person_settings['unique_seq'] = experiment.unique_seq
             this_person_settings['stimlist'] = experiment.stimlist
             this_person_settings['stimpr'] = experiment.stimpr
             this_person_settings['last_N'] = experiment.last_N
@@ -760,6 +775,8 @@ class Experiment:
         self.stimtrial = None
         # global trial number -> stimulus number mapping (e.g. {1 : 1, 2 : 2, 3 : 2, 4 : 4})
         self.stimlist = None
+        # participant's unique sequence base on his number
+        self.unique_seq = None
         # global trial number -> first trial of the next session mapping (e. g.{1 : 3, 2 : 3, 3 : 5, 4 : 5} - two sessions with two trials in each)
         self.end_at = None
         # global trial number -> pattern or random stimulus mapping (e. g.{1 : 'pattern', 2 : 'random', 3 : 'pattern', 4 : 'random'} - two sessions with two trials in each)
@@ -864,14 +881,20 @@ class Experiment:
     def create_sequence(self):
         """Generates csv file with list of stimuli for current session."""
 
-        keys = [1, 2, 3, 4, 5] # permuter
+        keys = [1, 2, 3, 4, 5]
+        # maybe need to create a loop to iter until finds a seq that was not used yet
+        if self.unique_seq is None: 
+            np.random.shuffle(keys)
+            self.unique_seq = keys
+        else:
+            keys = self.unique_seq
+        
         trials = np.arange(1, self.settings.get_maxtrial('trainTest') + 2)
         half = self.settings.get_maxtrial('test')/2
         data = pd.DataFrame({'trials': trials,
                              'trial_keys': np.zeros(len(trials), dtype=int),
                              'trial_type': ['to_define']*len(trials)})
 
-        np.random.shuffle(keys)
 
         if self.settings.current_session == 1:
             for trial in trials:
@@ -879,8 +902,17 @@ class Experiment:
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(1, (self.settings.trials_in_tBlock + 1)):
-                    data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
+                    if data.trial_keys.at[trial-1] == keys[0]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([1, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[1]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[2]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[3]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 4])]
+                    else:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 3])]
                 elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + half + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
@@ -921,8 +953,17 @@ class Experiment:
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'no transition'
                 elif trial in np.arange(1, (self.settings.trials_in_tBlock + 1)):
-                    data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'training'
+                    if data.trial_keys.at[trial-1] == keys[0]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([1, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[1]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[2]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[3]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 4])]
+                    else:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 3])]
                 elif trial in np.arange((self.settings.trials_in_tBlock + half + 1), (len(trials) + 1)):
                     data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
@@ -1005,12 +1046,11 @@ class Experiment:
 
             self.stimtrial[all_trial_Nr] = current_trial_num
             self.stimblock[all_trial_Nr] = 0
-
-
+        
+        # test
         for block in range(1, self.settings.blocks_in_session + 1):
             block_num += 1
 
-            # test
             for test in range(1, self.settings.trials_in_block + 1):
                 current_trial_num += 1
                 all_trial_Nr += 1
@@ -1383,7 +1423,7 @@ class Experiment:
         whatnow = self.instructions.feedback_RT_acc(
             rt_mean, rt_mean_str, acc_for_the_whole, acc_for_the_whole_str, self.mywindow, self.settings)
 
-    def wait_for_response1(self, expected_response, response_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
+    def wait_for_response_1(self, expected_response, response_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start):
         """ for eyetracker """
         press = []
         in_hit_region = None
@@ -1428,8 +1468,9 @@ class Experiment:
             return (-1, press[0][1])
         return (self.pressed_dict[press[0][0]], press[0][1])
 
-    def wait_for_response3(self, expected_response,  response_clock):
+    def wait_for_response_3(self, expected_response,  response_clock):
         """ without eyetracking """
+        
         press = []
         while len(press) == 0:
             press = event.getKeys(keyList=self.settings.get_key_list(), timeStamped=response_clock)
@@ -1438,8 +1479,9 @@ class Experiment:
             return (-1, press[0][1])
         return (self.pressed_dict[press[0][0]], press[0][1])
 
-    def wait_for_response2(self, tStart, k=0, r=0, t=0): # create a while loop and insert eyetracking function
-        """ with response box"""
+    def wait_for_response_2(self, tStart, k=0, r=0, t=0): # create a while loop and insert eyetracking function
+        """ with response box, to merge with wait_for_response_1 """
+        
         key_from_serial2 = str(port_s.readline())[2:-1]
         if len(key_from_serial2) > 0:
             key_from_serial2 = key_from_serial2[3]
@@ -1635,7 +1677,7 @@ class Experiment:
                 circle_stim.setPos(dict_pos[n])
                 self.mywindow.flip()
                 
-                response = self.wait_for_response3(n, trial_clock)[0]
+                response = self.wait_for_response_3(n, trial_clock)[0]
                 if response == n:
                     stim.setOpacity(0)
                     self.mywindow.flip()
@@ -1668,15 +1710,15 @@ class Experiment:
         
         
         outer = visual.Circle(win=self.mywindow, units='deg', radius=size/6,
-                              fillColor='black', opacity=1)
+                              fillColor='black', opacity=.7)
         inner = visual.Circle(win=self.mywindow, units='deg', radius=size/36,
-                              fillColor='black', opacity=1)
+                              fillColor='black', opacity=.7)
         cross = visual.ShapeStim(
             win=self.mywindow, vertices='cross',
             units='deg', size=(size/3, size/3),
             ori=0.0, pos=(0, 0),
             lineWidth=.5,  lineColor='white', fillColor='white',
-            opacity=1, depth=-8.0, interpolate=True)
+            opacity=.7, depth=-8.0, interpolate=True)
         
         # Photodiode configuration
         pixel = visual.Rect(win=self.mywindow, units='pix',
@@ -1747,6 +1789,23 @@ class Experiment:
 
         # show instructions or continuation message
         if N in self.settings.get_session_starts():
+            self.print_to_screen("Bienvenue !")
+            core.wait(5)
+            self.mywindow.flip()
+            
+            # starting resting state
+            if resting_state:
+                self.print_to_screen("Fixez la croix de fixation.")
+                core.wait(2)
+                self.mywindow.flip()
+            
+                timer = core.CountdownTimer(self.settings.rs_time)
+                while timer.getTime() > 0:
+                    outer.draw()
+                    cross.draw()
+                    inner.draw()
+                    self.mywindow.flip()
+            
             self.instructions.show_instructions(self)
             if tutorial:
                 self.super_tutorial(size, outer, inner, cross)
@@ -1835,12 +1894,12 @@ class Experiment:
                 if cycle == 1:
                     trial_clock.reset()
                 if eyetracking:
-                    (response, time_stamp) = self.wait_for_response1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
+                    (response, time_stamp) = self.wait_for_response_1(self.stimlist[N], trial_clock, eye_used, old_sample, new_sample, in_hit_region, minimum_duration, gaze_start)
                 else:
-                    (response, time_stamp) = self.wait_for_response3(self.stimlist[N], trial_clock)
+                    (response, time_stamp) = self.wait_for_response_3(self.stimlist[N], trial_clock)
 
                 # if meg_session:
-                #     (respKeys, respRT, tresptrig) = self.wait_for_response2(tStart)
+                #     (respKeys, respRT, tresptrig) = self.wait_for_response_2(tStart)
                 
                 with self.shared_data_lock:
                     self.trial_phase = "after_reaction"
@@ -1958,6 +2017,7 @@ class Experiment:
                     core.wait(2)
                 else:
                     self.resting_period(outer, cross, inner, self.settings)
+                    core.wait(2)
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
@@ -1975,17 +2035,44 @@ class Experiment:
                     self.close_to_break(outer, cross, inner, self.settings, eye_used, old_sample, new_sample, minimum_duration, gaze_start)
                 else:
                     self.resting_period(outer, cross, inner, self.settings)
+                if meg_session:
+                    # stop MEG recordings for recalibration
+                    time.sleep(2)
+                    port.setData(253)
+                    time.sleep(.005)
+                    port.setData(0)
                 self.person_data.flush_data_to_output(self)
                 self.person_data.save_person_settings(self)
 
-                timer = core.CountdownTimer(self.settings.rest_time+3)
-                while timer.getTime() > 0:
+                if meg_session:
                     self.show_feedback(N, responses_in_block, accs_in_block, RT_all_list)
+                    press = event.waitKeys(keyList=self.settings.key_resume)
+                    if self.settings.key_resume in press:
+                        # restart the MEG recordings
+                        port.setData(0)
+                        time.sleep(.005)
+                        port.setData(252)
+                        time.sleep(.005)
+                        port.setData(0)
+                        self.mywindow.flip()
+                    self.print_to_screen('Appuyez sur une touche pour reprendre.')
+                    press_1 = event.waitKeys(keyList=self.settings.get_key_list())
+                    if press_1 in self.settings.get_key_list():
+                        self.mywindow.flip()
+                else:
+                    timer = core.CountdownTimer(self.settings.rest_time+3)
+                    while timer.getTime() > 0:
+                        self.show_feedback(N, responses_in_block, accs_in_block, RT_all_list)
+                    self.print_to_screen('Appuyez sur une Y pour reprendre.')
+                    press_1 = event.waitKeys(keyList=self.settings.get_key_list())
+                    if press_1 in self.settings.get_key_list():
+                        self.mywindow.flip()
+
                 outer.draw()
                 cross.draw()
                 inner.draw()
                 self.mywindow.flip()
-                core.wait(2)
+                core.wait(1)
 
                 responses_in_block = 0
                 RT_all_list = []
@@ -1994,14 +2081,48 @@ class Experiment:
 
             # end of training
             if N == self.settings.trials_in_tBlock + 1:
-                self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur Y pour lancer la vraie tache !")
-                press = event.waitKeys(keyList=self.settings.get_key_list())
-                if self.settings.key_quit in press:
-                    self.EL_abort()
-                    core.quit()
+                if meg_session:
+                    self.print_to_screen("Fin de l'entraînement !\n\nReposez-vous.")
+                    # stop MEG recordings for recalibration
+                    time.sleep(2)
+                    port.setData(253)
+                    time.sleep(.005)
+                    port.setData(0)
+                                    
+                    press = event.waitKeys(keyList=self.settings.key_resume)
+                    if self.settings.key_resume in press:
+                        # restart the MEG recordings
+                        port.setData(0)
+                        time.sleep(.005)
+                        port.setData(252)
+                        time.sleep(.005)
+                        port.setData(0)
+                        self.mywindow.flip()
+                    self.print_to_screen('Appuyez sur une touche pour lancer la vraie tâche.')
+                    press_1 = event.waitKeys(keyList=self.settings.get_key_list())
+                    if press_1 in self.settings.get_key_list():
+                        self.mywindow.flip()
+                else:
+                    self.print_to_screen("Fin de l'entraînement.\n\nAppuyez sur Y pour lancer la vraie tache !")
+                    press = event.waitKeys(keyList=self.settings.get_key_list())
+                    if self.settings.key_quit in press:
+                        self.EL_abort()
+                        core.quit()
 
             # end of session
             if N == self.end_at[N - 1]:
+                # ending resting state
+                if resting_state:
+                    self.print_to_screen("Fixez la croix de fixation")
+                    core.wait(2)
+                    self.mywindow.flip()
+                    timer = core.CountdownTimer(self.settings.rs_time)
+                    while timer.getTime() > 0:
+                        outer.draw()
+                        cross.draw()
+                        inner.draw()
+                        self.mywindow.flip()
+
                 if self.settings.current_session == self.settings.numsessions:
                     self.print_to_screen("Fin de la tâche.\n\nMerci d'avoir participé !")
                 else:
@@ -2076,6 +2197,11 @@ class Experiment:
             print(self.frame_time)
             print(self.frame_sd)
             print(self.frame_rate)           
+
+            # timer = core.CountdownTimer(5)
+            # while timer.getTime() > 0:
+            #     self.print_to_screen("Bienvenue !")
+            # self.mywindow.flip()
 
             if eyetracking:
                 # initialize EyeLink

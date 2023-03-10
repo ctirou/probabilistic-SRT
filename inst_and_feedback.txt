@@ -1,8 +1,7 @@
 inst#
 
-Bienvenue!
-
-Sur l'écran, vous verrez cinq images apparaître une à la fois.
+Sur l'écran, vous verrez cinq images apparaître 
+une à la fois.
 
 Votre tâche consiste à appuyer sur la touche correspondant à l'image qui vient d'apparaître.
 
@@ -20,8 +19,6 @@ Appuyez sur les touches correspondantes aux images
 le plus précisément et le plus rapidement possible !
 
 L'image suivante n'apparaîtra pas tant que vous que vous ne donnez pas la bonne réponse.
-
-Utilisez uniquement votre main droite.
 
 Appuyez sur Y pour continuer.
 
