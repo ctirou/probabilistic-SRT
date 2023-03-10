@@ -58,6 +58,8 @@ Appuyez sur Y pour lancer la vraie tache !
 
 feedback#
 
+PAUSE
+
 Votre temps de réaction moyen : *MEANRT* secondes
 Votre précision : *PERCACC* %
 

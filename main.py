@@ -18,10 +18,10 @@ import pandas as pd
 import numpy as np
 from math import atan2, degrees, fabs
 
-debug_mode = True
+debug_mode = False
 meg_session = False
 eyetracking = False
-tutorial = False
+tutorial = True
 resting_state = False
 
 if debug_mode:
@@ -32,7 +32,7 @@ if debug_mode:
     resting_time = 1
     
 else:
-    mouse_visible = False
+    mouse_visible = True
     full_screen = False
     screen_width = 1920
     screen_height = 1080
@@ -482,7 +482,7 @@ class InstructionHelper:
 
     def __print_to_screen(self, mytext, mywindow):
         text_stim = visual.TextStim(mywindow, text=mytext,
-                                    units='cm', height=0.8, wrapWidth=20, color='black')
+                                    units='cm', height=0.7, wrapWidth=20, color='black')
         text_stim.draw()
         mywindow.flip()
 
@@ -1339,7 +1339,7 @@ class Experiment:
         """Display any string on the screen."""
 
         xtext = visual.TextStim(self.mywindow, text=mytext,
-                                units="cm", height=0.8, wrapWidth=20,
+                                units="cm", height=0.7, wrapWidth=20,
                                 color="black")
         xtext.draw()
         self.mywindow.flip()
@@ -1611,30 +1611,30 @@ class Experiment:
         prefs.hardware['audioDevice'] = 'Haut-parleurs (Sound Blaster Audigy 5/Rx)'
         prefs.hardware['audioLatencyMode'] = 4
 
-    def circle_bg(self, dict_pos):
+    def circle_bg(self, stimbg, dict_pos):
         """Draw empty stimulus circles."""
 
-        one = circle_bg = visual.Circle(win=self.mywindow, radius=20, units="cm", 
-                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[1])
-        two = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
-                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[2])
-        three = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
-                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[3])
-        four = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
-                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[4])
-        five = circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm", 
-                                fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[5])
+        # one = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
+        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[1])
+        # two = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
+        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[2])
+        # three = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
+        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[3])
+        # four = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
+        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[4])
+        # five = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
+        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[5])
 
-        one.draw()
-        two.draw()
-        three.draw()
-        four.draw()
-        five.draw()
+        # one.draw()
+        # two.draw()
+        # three.draw()
+        # four.draw()
+        # five.draw()
 
-        # for i in range(1, 6):
-        #     stimbg.pos = dict_pos[i]
-        #     stimbg.draw()
-        #     self.print_to_screen(str(i))
+        for i in range(1, 6):
+            stimbg.pos = dict_pos[i]
+            stimbg.draw()
+            self.print_to_screen(str(i))
 
 
     def super_tutorial(self, size, outer, inner, cross):
@@ -1651,29 +1651,33 @@ class Experiment:
                     5: (-300, -300)}
                 
         n = 1
+        count = 1
+        reset = []
+        for i in range(0, self.settings.trials_in_pretrain, 5):
+            reset.append(i)
+        
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
             pos=(0,0), units='deg', size=(size, size), opacity=0)
-        # circle_bg = visual.Circle(win=self.mywindow, radius=5, units="cm",
-        #                        fillColor=None, lineColor='black', lineWidth=3)
-        circle_stim = visual.Circle(win=self.mywindow, radius=5, units="cm", fillColor='green')
+        circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm",
+                               fillColor=None, lineColor='black', lineWidth=3)
+        circle_stim = visual.Circle(win=self.mywindow, radius=3, units="cm", fillColor='green')
                         
         while True:
-            stim.draw()
             outer.draw()
             cross.draw()
             inner.draw()
-            self.circle_bg(dict_pos)
+            self.circle_bg(circle_bg, dict_pos)
             self.mywindow.flip()
+            stim.draw()
 
             while True:
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
                     pos=(0,0), units='deg', size=(size, size), opacity=1)
                 stim.draw()
-                circle_stim.draw()
                 outer.draw()
                 cross.draw()
                 inner.draw()
-                self.circle_bg(dict_pos)
+                self.circle_bg(circle_bg, dict_pos)
                 circle_stim.setPos(dict_pos[n])
                 self.mywindow.flip()
                 
@@ -1681,10 +1685,15 @@ class Experiment:
                 if response == n:
                     stim.setOpacity(0)
                     self.mywindow.flip()
+                    if n in reset:
+                        n = 0
                     n += 1
+                    count += 1
                     break
+                elif response == self.settings.key_quit:
+                    core.quit()
             
-            if n == self.settings.trials_in_pretrain+1:
+            if count == self.settings.trials_in_pretrain+1:
                 break
         
         self.mywindow.flip()
