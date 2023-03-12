@@ -34,8 +34,8 @@ if debug_mode:
 else:
     mouse_visible = True
     full_screen = False
-    screen_width = 1920
-    screen_height = 1080
+    screen_width = 1080
+    screen_height = 720
 
 if eyetracking:
     import pylink
@@ -1612,30 +1612,11 @@ class Experiment:
         prefs.hardware['audioLatencyMode'] = 4
 
     def circle_bg(self, stimbg, dict_pos):
-        """Draw empty stimulus circles."""
-
-        # one = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
-        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[1])
-        # two = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
-        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[2])
-        # three = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
-        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[3])
-        # four = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
-        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[4])
-        # five = circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm", 
-        #                         fillColor=None, lineColor='black', lineWidth=3, pos=dict_pos[5])
-
-        # one.draw()
-        # two.draw()
-        # three.draw()
-        # four.draw()
-        # five.draw()
+        """ Draw empty stimulus circles. """
 
         for i in range(1, 6):
-            stimbg.pos = dict_pos[i]
+            stimbg.setPos(dict_pos[i])
             stimbg.draw()
-            self.print_to_screen(str(i))
-
 
     def super_tutorial(self, size, outer, inner, cross):
         
@@ -1644,11 +1625,11 @@ class Experiment:
                 
         trial_clock = core.Clock()
         
-        dict_pos = {1: (-200, -250),
-                    2: (-100, -250),
-                    3: (100, -250),
-                    4: (200, -250),
-                    5: (-300, -300)}
+        dict_pos = {1: (-150, -150),
+                    2: (-50, -150),
+                    3: (50, -150),
+                    4: (150, -150),
+                    5: (-250, -200)}
                 
         n = 1
         count = 1
@@ -1657,11 +1638,17 @@ class Experiment:
             reset.append(i)
         
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
-            pos=(0,0), units='deg', size=(size, size), opacity=0)
-        circle_bg = visual.Circle(win=self.mywindow, radius=1, units="cm",
-                               fillColor=None, lineColor='black', lineWidth=3)
-        circle_stim = visual.Circle(win=self.mywindow, radius=3, units="cm", fillColor='green')
-                        
+                                pos=(0,0), units='deg', size=(size, size), opacity=0)
+        circle_bg = visual.Circle(win=self.mywindow, radius=25, units="pix",
+                                  fillColor=None, lineColor='black', lineWidth=5)
+        circle_stim = visual.Circle(win=self.mywindow, radius=24, units="pix", fillColor='green')
+        
+        tuto = [1, 2, 3, 4, 5,
+                4, 3, 2, 5, 1,
+                2, 1, 4, 3, 5,
+                3, 5, 2, 1, 4,
+                5, 4, 3, 2, 1]
+        
         while True:
             outer.draw()
             cross.draw()
@@ -1672,13 +1659,15 @@ class Experiment:
 
             while True:
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
-                    pos=(0,0), units='deg', size=(size, size), opacity=1)
+                                        pos=(0,0), units='deg', size=(size, size), opacity=1)
+                circle_stim.setPos(dict_pos[n])
+
                 stim.draw()
                 outer.draw()
                 cross.draw()
                 inner.draw()
                 self.circle_bg(circle_bg, dict_pos)
-                circle_stim.setPos(dict_pos[n])
+                circle_stim.draw()
                 self.mywindow.flip()
                 
                 response = self.wait_for_response_3(n, trial_clock)[0]
@@ -1697,7 +1686,7 @@ class Experiment:
                 break
         
         self.mywindow.flip()
-        self.print_to_screen("Bravo vous avez terminé le tutoriel.\n\n L'entraînement va se lancer. Préparez-vous.")
+        self.print_to_screen("Bravo vous avez terminé le tutoriel.\n\n Appuyez sur Y pour lancer l'entraînement.")
         core.wait(2)
 
     def presentation(self):
