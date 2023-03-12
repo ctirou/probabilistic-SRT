@@ -1625,11 +1625,11 @@ class Experiment:
                 
         trial_clock = core.Clock()
         
-        dict_pos = {1: (-150, -150),
-                    2: (-50, -150),
-                    3: (50, -150),
-                    4: (150, -150),
-                    5: (-250, -200)}
+        dict_pos = {1: (-100, -150),
+                    2: (0, -150),
+                    3: (100, -150),
+                    4: (200, -150),
+                    5: (-200, -200)}
                 
         n = 1
         count = 1
@@ -1641,7 +1641,8 @@ class Experiment:
                                 pos=(0,0), units='deg', size=(size, size), opacity=0)
         circle_bg = visual.Circle(win=self.mywindow, radius=25, units="pix",
                                   fillColor=None, lineColor='black', lineWidth=5)
-        circle_stim = visual.Circle(win=self.mywindow, radius=24, units="pix", fillColor='green')
+        correct = visual.Circle(win=self.mywindow, radius=24, units="pix", fillColor='green')
+        wrong = visual.Circle(win=self.mywindow, radius=24, units="pix", fillColor='red', opacity=.6)
         
         tuto = [1, 2, 3, 4, 5,
                 4, 3, 2, 5, 1,
@@ -1660,14 +1661,14 @@ class Experiment:
             while True:
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
                                         pos=(0,0), units='deg', size=(size, size), opacity=1)
-                circle_stim.setPos(dict_pos[n])
+                correct.setPos(dict_pos[n])
 
                 stim.draw()
                 outer.draw()
                 cross.draw()
                 inner.draw()
                 self.circle_bg(circle_bg, dict_pos)
-                circle_stim.draw()
+                correct.draw()
                 self.mywindow.flip()
                 
                 response = self.wait_for_response_3(n, trial_clock)[0]
@@ -1681,6 +1682,11 @@ class Experiment:
                     break
                 elif response == self.settings.key_quit:
                     core.quit()
+                else:
+                    wrong.setPos(dict_pos[response])
+                    wrong.draw()
+                    # self.mywindow.flip()
+
             
             if count == self.settings.trials_in_pretrain+1:
                 break
