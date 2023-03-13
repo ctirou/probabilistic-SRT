@@ -33,7 +33,7 @@ if debug_mode:
     
 else:
     mouse_visible = False
-    full_screen = False
+    full_screen = True
     screen_width = 1920
     screen_height = 1080
 
@@ -1640,11 +1640,11 @@ class Experiment:
                         
         trial_clock = core.Clock()
         
-        dict_pos = {1: (-100, -350),
-                    2: (0, -350),
-                    3: (100, -350),
-                    4: (200, -350),
-                    5: (-200, -400)}
+        dict_pos = {1: (-100, -250),
+                    2: (0, -250),
+                    3: (100, -250),
+                    4: (200, -250),
+                    5: (-200, -300)}
                 
         n = 1
         
@@ -1744,7 +1744,7 @@ class Experiment:
                             pos=(0, screen_height/2),
                             size=(screen_width, 100),
                             fillColor='black', lineColor='black')
-        pixel.setAutoDraw(True) # set to True/False to activate/deactivate
+        # pixel.setAutoDraw(True) # set to True/False to activate/deactivate
 
         # feedbacks during training block
         green = visual.Circle(win=self.mywindow, units='deg', radius=sizep/2,
@@ -1898,7 +1898,7 @@ class Experiment:
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]],
                                         pos=(0,0), units='deg', size=(sizep, sizep), opacity=1)
                 stim.draw()
-                pixel.setAutoDraw(False)
+                # pixel.setAutoDraw(False)
                 # fixation_cross.draw()
                 outer.draw()
                 cross.draw()
@@ -1953,7 +1953,7 @@ class Experiment:
                         port.setData(0)
                     # start of the RSI timer and offset of the stimulus
                     stim.setOpacity(0)
-                    pixel.setAutoDraw(True)
+                    # pixel.setAutoDraw(True)
                     stim.draw()
                     self.mywindow.flip()
                     RSI_clock.reset()
@@ -2089,7 +2089,7 @@ class Experiment:
                     timer = core.CountdownTimer(self.settings.rest_time+3)
                     while timer.getTime() > 0:
                         self.show_feedback(N, responses_in_block, accs_in_block, RT_all_list)
-                    self.print_to_screen('Appuyez sur une Y pour reprendre.')
+                    self.print_to_screen('Appuyez sur Y pour reprendre.')
                     press_1 = event.waitKeys(keyList=self.settings.get_key_list())
                     if press_1 in self.settings.get_key_list():
                         self.mywindow.flip()
