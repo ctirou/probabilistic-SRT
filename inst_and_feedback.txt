@@ -42,9 +42,9 @@ inst#
 Vous recevrez régulièrement des commentaires sur vos performances 
 - servez-vous en pour vous améliorer !
 
-Vous commencerez par une phase d'entraînement.
+Vous commencerez par un petit tutoriel.
 
-Quand vous êtes prêt(e), appuyez sur Y pour lancer la tâche !
+Quand vous êtes prêt(e), appuyez sur Y pour commencer !
 
 ***
 
@@ -52,7 +52,7 @@ training end#
 
 Fin de l'entraînement.
 
-Appuyez sur Y pour lancer la vraie tache !
+Appuyez sur Y pour lancer la vraie tâche !
 
 ***
 

@@ -32,10 +32,10 @@ if debug_mode:
     resting_time = 1
     
 else:
-    mouse_visible = True
+    mouse_visible = False
     full_screen = False
-    screen_width = 1080
-    screen_height = 720
+    screen_width = 1920
+    screen_height = 1080
 
 if eyetracking:
     import pylink
@@ -337,7 +337,7 @@ class ExperimentSettings:
         settings_dialog.addText('No settings saved for this experiment yet...')
         settings_dialog.addField('Current session:', choices=['1st', '2nd'])
         settings_dialog.addField('Blocks per session', 120)
-        settings_dialog.addField('Trials in pre-training', 25)
+        settings_dialog.addField('Trials in pre-training', 30)
         settings_dialog.addField('Trials in training block', 40)
         settings_dialog.addField('Trials per testing block', 20)
         returned_data = settings_dialog.show()
@@ -914,8 +914,17 @@ class Experiment:
                     else:
                         data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 3])]
                 elif trial in np.arange((self.settings.trials_in_tBlock + 1), (self.settings.trials_in_tBlock + half + 1)):
-                    data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
+                    if data.trial_keys.at[trial-1] == keys[0]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([1, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[1]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[2]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[3]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 4])]
+                    else:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 3])]
                 else:
                     if data.trial_keys[trial-1] == keys[0]:
                         data.trial_keys.at[trial] = keys[1]
@@ -965,8 +974,17 @@ class Experiment:
                     else:
                         data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 3])]
                 elif trial in np.arange((self.settings.trials_in_tBlock + half + 1), (len(trials) + 1)):
-                    data.trial_keys.at[trial] = np.random.choice(keys)
                     data.trial_type.at[trial] = 'random'
+                    if data.trial_keys.at[trial-1] == keys[0]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([1, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[1]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 2, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[2]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 3, 4])]
+                    elif data.trial_keys.at[trial-1] == keys[3]:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 4])]
+                    else:
+                        data.trial_keys.at[trial] = keys[np.random.choice([0, 1, 2, 3])]
                 else:
                     if data.trial_keys[trial-1] == keys[0]:
                         data.trial_keys.at[trial] = keys[1]
@@ -1527,7 +1545,7 @@ class Experiment:
     def resting_period(self, outer, cross, inner, experiment):
         """Resting time with eyes closed."""
 
-        self.print_to_screen("Fermez vos yeux.")
+        self.print_to_screen("Fermez vos yeux")
         if not meg_session:
             core.wait(2)
         # wait for closing of eyes with eye-tracker
@@ -1560,7 +1578,7 @@ class Experiment:
         in_hit_region = None
         
         while not closed:
-            self.print_to_screen("Fermez vos yeux pour lancer la tâche.")
+            self.print_to_screen("Fermez vos yeux pour lancer la pause")
             
             # timer = core.CountdownTimer(10)
             # while timer.getTime() > 0:
@@ -1618,37 +1636,32 @@ class Experiment:
             stimbg.setPos(dict_pos[i])
             stimbg.draw()
 
-    def super_tutorial(self, size, outer, inner, cross):
-        
-        self.print_to_screen("Vous allez commencez le tutoriel.\n\nPréparez-vous.")
-        core.wait(2)
-                
+    def super_tutorial(self, sizep, outer, inner, cross):
+                        
         trial_clock = core.Clock()
         
-        dict_pos = {1: (-100, -150),
-                    2: (0, -150),
-                    3: (100, -150),
-                    4: (200, -150),
-                    5: (-200, -200)}
+        dict_pos = {1: (-100, -350),
+                    2: (0, -350),
+                    3: (100, -350),
+                    4: (200, -350),
+                    5: (-200, -400)}
                 
         n = 1
-        count = 1
-        reset = []
-        for i in range(0, self.settings.trials_in_pretrain, 5):
-            reset.append(i)
         
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
-                                pos=(0,0), units='deg', size=(size, size), opacity=0)
+                                pos=(0,0), units='deg', size=(sizep, sizep), opacity=0)
         circle_bg = visual.Circle(win=self.mywindow, radius=25, units="pix",
                                   fillColor=None, lineColor='black', lineWidth=5)
         correct = visual.Circle(win=self.mywindow, radius=24, units="pix", fillColor='green')
         wrong = visual.Circle(win=self.mywindow, radius=24, units="pix", fillColor='red', opacity=.6)
         
         tuto = [1, 2, 3, 4, 5,
-                4, 3, 2, 5, 1,
-                2, 1, 4, 3, 5,
+                1, 2, 3, 4, 5,
+                1, 2, 3, 4, 5,
                 3, 5, 2, 1, 4,
-                5, 4, 3, 2, 1]
+                2, 4, 1, 5, 1,
+                5, 1, 4, 2, 3]
+        dict_t = {i+1 : tuto[i] for i in range(0, len(tuto))}
         
         while True:
             outer.draw()
@@ -1659,9 +1672,9 @@ class Experiment:
             stim.draw()
 
             while True:
-                stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[n],
-                                        pos=(0,0), units='deg', size=(size, size), opacity=1)
-                correct.setPos(dict_pos[n])
+                stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[dict_t[n]],
+                                        pos=(0,0), units='deg', size=(sizep, sizep), opacity=1)
+                correct.setPos(dict_pos[dict_t[n]])
 
                 stim.draw()
                 outer.draw()
@@ -1671,38 +1684,40 @@ class Experiment:
                 correct.draw()
                 self.mywindow.flip()
                 
-                response = self.wait_for_response_3(n, trial_clock)[0]
-                if response == n:
+                response = self.wait_for_response_3(dict_t[n], trial_clock)[0]
+                if response == dict_t[n]:
                     stim.setOpacity(0)
                     self.mywindow.flip()
-                    if n in reset:
-                        n = 0
                     n += 1
-                    count += 1
                     break
                 elif response == self.settings.key_quit:
                     core.quit()
                 else:
                     wrong.setPos(dict_pos[response])
                     wrong.draw()
-                    # self.mywindow.flip()
-
             
-            if count == self.settings.trials_in_pretrain+1:
+            if n == self.settings.trials_in_pretrain+1:
                 break
         
         self.mywindow.flip()
         self.print_to_screen("Bravo vous avez terminé le tutoriel.\n\n Appuyez sur Y pour lancer l'entraînement.")
-        core.wait(2)
+        core.wait(1)
+        press = event.waitKeys(keyList=self.settings.get_key_list())
+        if press in self.settings.get_key_list():
+            self.mywindow.flip()
+        elif self.settings.key_quit in press:
+            core.quit()
+
 
     def presentation(self):
         """The real experiment happens here. This method displays the stimulus window and records the RTs."""
 
         size = self.pixel_to_degrees(128)
+        sizep = self.pixel_to_degrees(254)
 
         # stimulus init
         stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[1]],
-                                pos=(0,0), units='deg', size=(size, size), opacity=0)
+                                pos=(0,0), units='deg', size=(sizep, sizep), opacity=0)
 
 
         # fixation cross init
@@ -1732,10 +1747,10 @@ class Experiment:
         pixel.setAutoDraw(True) # set to True/False to activate/deactivate
 
         # feedbacks during training block
-        green = visual.Circle(win=self.mywindow, units='deg', radius=size/2,
+        green = visual.Circle(win=self.mywindow, units='deg', radius=sizep/2,
                             lineColor='green', fillColor='green',
                             opacity=.50)
-        red = visual.Circle(win=self.mywindow, units='deg', radius=size/2,
+        red = visual.Circle(win=self.mywindow, units='deg', radius=sizep/2,
                             lineColor='red', fillColor='red',
                             opacity=.50)
         
@@ -1811,8 +1826,15 @@ class Experiment:
                     self.mywindow.flip()
             
             self.instructions.show_instructions(self)
+            core.wait(1)
+            press = event.waitKeys(keyList=self.settings.get_key_list())
+            if press in self.settings.get_key_list():
+                self.mywindow.flip()
+            elif self.settings.key_quit in press:
+                core.quit()
+
             if tutorial:
-                self.super_tutorial(size, outer, inner, cross)
+                self.super_tutorial(sizep, outer, inner, cross)
         else:
             self.instructions.show_unexp_quit(self)
         
@@ -1874,7 +1896,7 @@ class Experiment:
                 respKeys = None
 
                 stim = visual.ImageStim(win=self.mywindow, image=self.image_dict[self.stimlist[N]],
-                                        pos=(0,0), units='deg', size=(size, size), opacity=1)
+                                        pos=(0,0), units='deg', size=(sizep, sizep), opacity=1)
                 stim.draw()
                 pixel.setAutoDraw(False)
                 # fixation_cross.draw()
